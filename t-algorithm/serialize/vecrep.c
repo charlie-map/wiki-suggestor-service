@@ -88,10 +88,10 @@ void *data_read(void *meta_ptr);
 
 int http_pull_to_file() {
 	// create stopword structure
-	trie_t *stopword_trie = fill_stopwords("stopwords.txt");
+	trie_t *stopword_trie = fill_stopwords("t-algorithm/serialize/stopwords.txt");
 
 	// create write stream:
-	FILE *index_writer = fopen("predocbags.txt", "w");
+	FILE *index_writer = fopen("docbags.txt", "w");
 	FILE *title_writer = fopen("title.txt", "w");
 
 	if (!index_writer || !title_writer) {

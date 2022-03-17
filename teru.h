@@ -46,7 +46,6 @@ typedef struct HeaderMap {
 
 	hashmap *query_map;
 	hashmap *body_map;
-
 } req_t;
 typedef struct ResStruct {
 	struct ResStruct *res_self;

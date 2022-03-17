@@ -125,7 +125,7 @@ char **deserialize(char *index_reader, hashmap *docs, int *max_words) {
 		free(line_subs[1]);
 
 		for (int read_doc_freq = 2; read_doc_freq < *line_sub_max; read_doc_freq += 2) {
-			hashmap_body_t *doc = get__hashmap(docs, line_subs[read_doc_freq], 0);
+			hashmap_body_t *doc = get__hashmap(docs, line_subs[read_doc_freq], "");
 			free(line_subs[read_doc_freq]);
 
 			// calculate term_frequency / document_frequency
