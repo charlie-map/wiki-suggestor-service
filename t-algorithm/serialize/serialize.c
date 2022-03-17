@@ -22,7 +22,7 @@ void destroy_hashmap_val(void *ptr) {
 }
 
 void *is_block(void *hmap, char *tag) {
-	return get__hashmap((hashmap *) hmap, tag, 0);
+	return get__hashmap((hashmap *) hmap, tag, "");
 }
 
 tf_t *new_tf_t(char *ID) {
@@ -128,7 +128,7 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 		char *prev_hash_key = (char *) getKey__hashmap(term_freq, full_page_data[add_hash]);
 
 		if (prev_hash_key) {
-			tf_t *hashmap_freq = (tf_t *) get__hashmap(term_freq, full_page_data[add_hash], 0);
+			tf_t *hashmap_freq = (tf_t *) get__hashmap(term_freq, full_page_data[add_hash], "");
 
 			free(full_page_data[add_hash]);
 
@@ -158,7 +158,7 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 	char **keys = (char **) keys__hashmap(term_freq, key_len, "m", is_m, *ID);
 
 	for (int count_sums = 0; count_sums < *key_len; count_sums++) {
-		tf_t *m_val = (tf_t *) get__hashmap(term_freq, keys[count_sums], 0);
+		tf_t *m_val = (tf_t *) get__hashmap(term_freq, keys[count_sums], "");
 		int key_freq = m_val->curr_term_freq;
 		sum_of_squares += key_freq * key_freq;
 
@@ -195,12 +195,6 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 	free(full_page_data);
 
 	return 0;
-}
-
-void destroy_hashmap_float(void *v) {
-	free((float *) v);
-
-	return;
 }
 
 int compareFloatKey(void *v1, void *v2) {

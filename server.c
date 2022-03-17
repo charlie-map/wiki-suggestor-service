@@ -1,6 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// add connections to t-algorithm:
+#include "t-algorithm/serialize/vecrep.h"
+#include "t-algorithm/nearest-neighbor/kd-tree.h"
+#include "t-algorithm/nearest-neighbor/k-means.h"
+#include "t-algorithm/nearest-neighbor/deserialize.h"
+#include "t-algorithm/utils/hashmap.h"
+
 #include "teru.h"
 
 #define HOST "localhost"

@@ -18,6 +18,7 @@
 
 #include "teru.h"
 #include "typeinfer.h"
+#include "t-algorithm/utils/helper.h"
 
 #define MAXLINE 4096
 
@@ -307,7 +308,7 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 	}
 
 	int *head_msg_len = malloc(sizeof(int));
-	char *main_head_msg = create_header(status, head_msg_len, status_code, headers, data_length);
+	char *main_head_msg = create_header_server(status, head_msg_len, status_code, headers, data_length);
 
 	// send header
 	int bytes_sent = 0;
@@ -515,7 +516,7 @@ req_t *read_header_helper(char *header_str, int header_length) {
 
 	// read the headers:
 	int *header_end_pos = malloc(sizeof(int)); // for then checking the body
-	mp_h->meta_header_map = read_headers(header_str, print_header, header_end_pos);
+	mp_h->meta_header_map = read_headers_server(header_str, print_header, header_end_pos);
 
 	// if the type matches (POST), read all the body
 	if (strcmp(mp_h->type, "POST") == 0) {

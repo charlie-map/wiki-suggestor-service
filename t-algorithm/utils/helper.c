@@ -3,6 +3,7 @@
 #include <stdarg.h>
 
 #include "helper.h"
+#include "hashmap.h"
 
 void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_size) {
 	while (curr_index >= *max_len) {
@@ -12,6 +13,12 @@ void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_siz
 	}
 	
 	return arr;
+}
+
+void destroy_hashmap_float(void *v) {
+	free((float *) v);
+
+	return;
 }
 
 // create index structure

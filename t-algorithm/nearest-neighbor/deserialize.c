@@ -6,12 +6,6 @@
 #include "deserialize.h"
 #include "../utils/helper.h"
 
-void destroy_hashmap_float(void *v) {
-	free((float *) v);
-
-	return;
-}
-
 hashmap_body_t *create_hashmap_body(char *id, char *title, float mag) {
 	hashmap_body_t *hm = (hashmap_body_t *) malloc(sizeof(hashmap_body_t));
 

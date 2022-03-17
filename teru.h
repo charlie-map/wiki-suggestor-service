@@ -3,8 +3,8 @@
 
 #define BACKLOG 10
 
-#include "request.h"
-#include "hashmap.h"
+#include "t-algorithm/utils/request.h"
+#include "t-algorithm/utils/hashmap.h"
 
 /*
 	Teru Struct:

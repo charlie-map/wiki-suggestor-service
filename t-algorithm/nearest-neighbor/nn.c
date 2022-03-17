@@ -34,7 +34,7 @@ int main() {
 		printf("\nCLUSTED %d:\n", read_clusters);
 
 		for (int read_cluster_doc = 0; read_cluster_doc < cluster[read_clusters]->doc_pos_index; read_cluster_doc++) {
-			char *title = ((hashmap_body_t *) get__hashmap(doc_map, cluster[read_clusters]->doc_pos[read_cluster_doc], 0))->title;
+			char *title = ((hashmap_body_t *) get__hashmap(doc_map, cluster[read_clusters]->doc_pos[read_cluster_doc], ""))->title;
 			printf("\tDocument %s: %s\n", cluster[read_clusters]->doc_pos[read_cluster_doc], title);
 		}
 	}
@@ -50,7 +50,7 @@ int main() {
 	int rand_doc_pos = rand() % *doc_map_length;
 	char *rand_doc_key = doc_map_keys[rand_doc_pos];
 
-	hashmap_body_t *rand_doc = (hashmap_body_t *) get__hashmap(doc_map, rand_doc_key, 0);
+	hashmap_body_t *rand_doc = (hashmap_body_t *) get__hashmap(doc_map, rand_doc_key, "");
 	printf("grabbed: %s\n", rand_doc->title);
 
 	free(doc_map_length);
@@ -60,7 +60,7 @@ int main() {
 
 	printf("CLOSEST CLUSTER:\n");
 	for (int read_cluster_doc = 0; read_cluster_doc < closest_cluster->doc_pos_index; read_cluster_doc++) {
-		char *title = ((hashmap_body_t *) get__hashmap(doc_map, closest_cluster->doc_pos[read_cluster_doc], 0))->title;
+		char *title = ((hashmap_body_t *) get__hashmap(doc_map, closest_cluster->doc_pos[read_cluster_doc], ""))->title;
 		printf("Document %s: %s\n", closest_cluster->doc_pos[read_cluster_doc], title);
 	}
 
@@ -75,17 +75,17 @@ int main() {
 	printf("\nbest dimensions: \n");
 	char *d_checker = d_1;
 	for (int read_dimensions = 0; read_dimensions < 10; read_dimensions++) {
-		int best_doc_freq = ((cluster_centroid_data *) get__hashmap(closest_cluster->centroid, d_checker, 0))->doc_freq;
+		int best_doc_freq = ((cluster_centroid_data *) get__hashmap(closest_cluster->centroid, d_checker, ""))->doc_freq;
 
 		printf("Dim %d: %s -- doc freq: %d\n", read_dimensions, d_checker, best_doc_freq);
 
-		d_checker = (char *) get__hashmap(dimensions, d_checker, 0);
+		d_checker = (char *) get__hashmap(dimensions, d_checker, "");
 	}
 
 	// build array of documents within the closest cluster:
 	hashmap_body_t **cluster_docs = malloc(sizeof(hashmap_body_t *) * closest_cluster->doc_pos_index);
 	for (int pull_cluster_doc = 0; pull_cluster_doc < closest_cluster->doc_pos_index; pull_cluster_doc++) {
-		cluster_docs[pull_cluster_doc] = (hashmap_body_t *) get__hashmap(doc_map, closest_cluster->doc_pos[pull_cluster_doc], 0);
+		cluster_docs[pull_cluster_doc] = (hashmap_body_t *) get__hashmap(doc_map, closest_cluster->doc_pos[pull_cluster_doc], "");
 	}
 
 	kdtree_t *cluster_rep = kdtree_create(weight, member_extract, d_1, next_dimension, distance, meta_distance);
@@ -125,12 +125,12 @@ char **build_dimensions(cluster_t *curr_cluster) {
 	for (int read_best = 0; read_best < cluster_size; read_best++) {
 
 		int best_stddev_pos = read_best;
-		float best_stddev = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[best_stddev_pos], 0))->standard_deviation;
-		int best_doc_freq = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[best_stddev_pos], 0))->doc_freq;
+		float best_stddev = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[best_stddev_pos], ""))->standard_deviation;
+		int best_doc_freq = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[best_stddev_pos], ""))->doc_freq;
 		for (int find_best_key = read_best + 1; find_best_key < *key_length; find_best_key++) {
 
-			float test_stddev = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[find_best_key], 0))->standard_deviation;
-			int test_doc_freq = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[find_best_key], 0))->doc_freq;
+			float test_stddev = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[find_best_key], ""))->standard_deviation;
+			int test_doc_freq = ((cluster_centroid_data *) get__hashmap(curr_cluster->centroid, keys[find_best_key], ""))->doc_freq;
 
 			// if test_stddev is greater than best_stddev, update best_stddev_pos and best_stddev
 			if (test_stddev * 0.6 + test_doc_freq > best_stddev * 0.6 + best_doc_freq && test_doc_freq < cluster_size) {
@@ -188,12 +188,12 @@ float meta_distance(void *map1_body, void *map2_body) {
 }
 
 void *member_extract(void *map_body, void *dimension) {
-	return get__hashmap(((hashmap_body_t *) map_body)->map, (char *) dimension, 0);
+	return get__hashmap(((hashmap_body_t *) map_body, "")->map, (char *) dimension);
 }
 
 void *next_dimension(void *curr_dimension) {
 	// curr dimension is a char * that searches into a hashmap for the next value
 	// this hashmap has each char * pointing to the next, which allows for the
 	// dimensions to be based on an initial weighting from the cluster centroid
-	return get__hashmap(dimensions, (char *) curr_dimension, 0);
+	return get__hashmap(dimensions, (char *) curr_dimension, "");
 }

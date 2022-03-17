@@ -1,7 +1,7 @@
 #ifndef __TYPEINFER_L__
 #define __TYPEINFER_L__
 
-#include "hashmap.h"
+#include "t-algorithm/utils/hashmap.h"
 
 hashmap *infer_load();
 

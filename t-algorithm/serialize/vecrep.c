@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <math.h>
 
+#include "vecrep.h"
 #include "trie.h"
 #include "token.h"
 #include "../utils/request.h"
@@ -85,7 +86,7 @@ serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_len
 
 void *data_read(void *meta_ptr);
 
-int main() {
+int http_pull_to_file() {
 	// create stopword structure
 	trie_t *stopword_trie = fill_stopwords("stopwords.txt");
 
@@ -184,7 +185,7 @@ int main() {
 	char **words = (char **) keys__hashmap(term_freq, word_len, "");
 
 	for (int fp_word = 0; fp_word < *word_len; fp_word++) {
-		tf_t *dat = get__hashmap(term_freq, words[fp_word], 0);
+		tf_t *dat = get__hashmap(term_freq, words[fp_word], "");
 
 		// check that the term has a high enough document frequency
 		if (dat->doc_freq < DTF_THRESHOLD) {

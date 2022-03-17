@@ -15,11 +15,95 @@
 #include <unistd.h>
 #include <netdb.h>
 
-#include "stack.h"
 #include "helper.h"
 #include "request.h"
 
 #define MAXLINE 4096
+
+/*
+     _             _    
+ ___| |_ __ _  ___| | __
+/ __| __/ _` |/ __| |/ /
+\__ \ || (_| | (__|   < 
+|___/\__\__,_|\___|_|\_\
+*/
+typedef struct LinkedList {
+	void *payload;
+
+	struct LinkedList *next;
+} stack_ll_t;
+
+typedef struct Stack {
+	stack_ll_t *stack_head;
+
+	int size;
+} stack_tv2;
+
+stack_tv2 *stack_create() {
+	stack_tv2 *new_stack = malloc(sizeof(stack_tv2));
+
+	new_stack->stack_head = NULL;
+	new_stack->size = 0;
+
+	return new_stack;
+}
+
+int stack_push(stack_tv2 *stack, void *payload) {
+	stack_ll_t *new_head = malloc(sizeof(stack_ll_t));
+
+	new_head->payload = payload;
+	new_head->next = NULL;
+
+	if (stack->stack_head) {
+		new_head->next = stack->stack_head;
+	}
+
+	stack->stack_head = new_head;
+	stack->size++;
+
+	return 0;
+}
+
+void *stack_peek(stack_tv2 *stack) {
+	return stack->stack_head->payload;
+}
+
+void *stack_pop(stack_tv2 *stack) {
+	stack_ll_t *pull_head = stack->stack_head;
+
+	if (!pull_head)
+		return NULL;
+
+	// update head
+	stack->stack_head = pull_head->next;
+
+	void *pull_head_payload = pull_head->payload;
+
+	free(pull_head);
+
+	stack->size--;
+	return pull_head_payload;
+}
+
+int stack_size(stack_tv2 *stack) {
+	return stack->size;
+}
+
+int stack_destroy(stack_tv2 *stack) {
+	while (stack->stack_head) {
+		stack_ll_t *next = stack->stack_head->next;
+
+		free(stack->stack_head);
+
+		stack->stack_head = next;
+	}
+
+	free(stack);
+
+	return 0;
+}
+
+
 
 struct Response {
 	hashmap *headers;
@@ -113,7 +197,7 @@ char *build_url(char *request_url, int *req_length, char *query_param, char **at
 	return full_request;
 }
 
-char *create_header(char *HOST, char *PORT, char *request_url, int *url_length, char *post_data) {
+char *create_header_client(char *HOST, char *PORT, char *request_url, int *url_length, char *post_data) {
 	int host_length = strlen(HOST);
 	char *build_host = malloc(sizeof(char) * (host_length + strlen(PORT) + 2));
 	memset(build_host, '\0', host_length + strlen(PORT) + 2);
@@ -139,6 +223,47 @@ char *create_header(char *HOST, char *PORT, char *request_url, int *url_length, 
 		"application/x-www-form-urlencoded" : "text/plain"), post_data_len, post_data ? post_data : "");
 
 	free(build_host);
+
+	return header;
+}
+
+char *create_header_server(int STATUS, int *header_max, hashmap *status_code, hashmap *headers, int post_data_size) {
+	int header_index = 0; *header_max = 32;
+	char *header = malloc(sizeof(char) * *header_max);
+
+	char *status_char = malloc(sizeof(char) * 4);
+	sprintf(status_char, "%d", STATUS);
+	char *status_phrase = (char *) get__hashmap(status_code, status_char, "");
+	int status_phrase_len = strlen(status_char) + strlen(status_phrase);
+
+	header_index = status_phrase_len + 11;
+	header = resize_array(header, header_max, header_index, sizeof(char));
+	sprintf(header, "HTTP/1.1 %s %s\n", status_char, status_phrase);
+
+	free(status_char);
+
+	// read all content response headers
+	int *key_num = malloc(sizeof(int));
+	char **header_key = (char **) keys__hashmap(headers, key_num, "");
+
+	for (int cp_header = 0; cp_header < *key_num; cp_header++) {
+		char *header_value = (char *) get__hashmap(headers, header_key[cp_header], "");
+
+		int head_add_on = strlen(header_key[cp_header]) + strlen(header_value) + 3;
+		header = resize_array(header, header_max, header_index + head_add_on + 4, sizeof(char));
+		sprintf(header + sizeof(char) * header_index, "%s: %s\n", header_key[cp_header], header_value);
+
+		header_index += head_add_on;
+		header[header_index] = '\0';
+	}
+
+	free(key_num);
+	free(header_key);
+
+	header = resize_array(header, header_max, header_index + 3, sizeof(char));
+
+	strcat(header, "\n\n");
+	*header_max = header_index + 3;
 
 	return header;
 }
@@ -195,7 +320,7 @@ char **handle_array(char *res, int *max_len) {
 	return arr;
 }
 
-hashmap *read_headers(char *header_str, int *header_end) {
+hashmap *read_headers_client(char *header_str, int *header_end) {
 	int past_lines = 0;
 
 	hashmap *header_map = make__hashmap(0, NULL, destroyCharKey);
@@ -249,6 +374,63 @@ hashmap *read_headers(char *header_str, int *header_end) {
 	return header_map;
 }
 
+hashmap *read_headers_server(char *header_str, void (*print_key)(void *), int *header_end) {
+	int past_lines = 0;
+
+	hashmap *header_map = make__hashmap(0, print_key, destroyCharKey);
+
+	// jump past HTTP: status line
+	while ((int) header_str[past_lines] != 10)
+		past_lines++;
+
+	past_lines += 1;
+
+	// while the newline doesn't start with a newline (heh)
+	// (double newline is end of header)
+	while ((int) header_str[past_lines] != 10) {
+		int *head_max = malloc(sizeof(int)), head_index = 0;
+		*head_max = 8;
+		char *head_tag = malloc(sizeof(char) * *head_max);
+
+		int *attr_max = malloc(sizeof(int)), attr_index = 0;
+		*attr_max = 8;
+		char *attr_tag = malloc(sizeof(char) * *attr_max);
+
+		// head head tag
+		while ((int) header_str[past_lines + head_index] != 58) {
+
+			head_tag[head_index] = header_str[past_lines + head_index];
+			head_index++;
+
+			head_tag = resize_array(head_tag, head_max, head_index, sizeof(char));
+			head_tag[head_index] = '\0';
+		}
+
+		past_lines += head_index + 2;
+
+		// read attr tag
+		while ((int) header_str[past_lines + attr_index + 1] != 10) {
+			attr_tag[attr_index] = header_str[past_lines + attr_index];
+			attr_index++;
+
+			attr_tag = resize_array(attr_tag, attr_max, attr_index, sizeof(char));
+			attr_tag[attr_index] = '\0';
+		}
+
+		// check for a carraige return (\r). This means the newline character is one further along
+		past_lines += attr_index + ((int) header_str[past_lines + attr_index + 2] == 13 ? 3 : 2);
+
+		insert__hashmap(header_map, head_tag, attr_tag, "", compareCharKey, destroyCharKey);
+
+		free(head_max);
+		free(attr_max);
+	}
+
+	*header_end = past_lines + 1;
+	return header_map;
+}
+
+
 // takes request url and will build the full url:
 res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char *type, ...) {
 	char *data = NULL;
@@ -259,7 +441,7 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 		data = va_arg(post_data, char *);
 	}
 
-	char *header = create_header(socket->HOST, socket->PORT, request_url, url_length, data);
+	char *header = create_header_client(socket->HOST, socket->PORT, request_url, url_length, data);
 
 	// send get request
 	int bytes_sent = 0, total_bytes = sizeof(char) * *url_length;
@@ -285,8 +467,8 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 
 	// read header
 	int *header_end = malloc(sizeof(int));
-	hashmap *headers = read_headers(header_read, header_end);
-	int content_length = atoi(get__hashmap(headers, "Content-Length", 0));
+	hashmap *headers = read_headers_client(header_read, header_end);
+	int content_length = atoi(get__hashmap(headers, "Content-Length", ""));
 
 	size_t full_req_len = sizeof(char) * content_length;
 	char *buffer = malloc(full_req_len + sizeof(char));

@@ -1,1 +1,0 @@
-gcc -g nn.c kd-tree.c deserialize.c k-means.c ../utils/helper.c ../utils/hashmap.c -lm

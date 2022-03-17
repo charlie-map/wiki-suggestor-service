@@ -4,6 +4,9 @@
 /* RESIZE FUNCTIONALITY */
 void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_size);
 
+/* DESTROY HASHMAP FLOAT */
+void destroy_hashmap_float(void *v);
+
 /* SPLIT STRING FUNCTIONALITY */
 int char_is_range(char _char);
 int num_is_range(char _char);

@@ -36,7 +36,7 @@ float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, flo
 		// grab value from each map
 		char *key = centroid_key[calc_dp];
 
-		void *pre_doc_word_tfidf = get__hashmap(centroid, key, 0);
+		void *pre_doc_word_tfidf = get__hashmap(centroid, key, "");
 		if (!pre_doc_word_tfidf) { // insert into centroid with new data
 			cluster_centroid_data *new_centroid_data = create_cluster_centroid_data(0.0);
 			insert__hashmap(centroid, key, new_centroid_data, "", compareCharKey, NULL);
@@ -44,7 +44,7 @@ float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, flo
 
 		float doc_word_tfidf = pre_doc_word_tfidf ? *(float *) pre_doc_word_tfidf : 0.0;
 
-		float centroid_word_tfidf = *(float *) get__hashmap(doc, key, 0);
+		float centroid_word_tfidf = *(float *) get__hashmap(doc, key, "");
 
 		dot_product += (doc_word_tfidf * centroid_word_tfidf);
 	}
@@ -89,7 +89,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 
 		int rand_copy_map_val = rand() % *doc_ID_len;
 
-		hashmap_body_t *copyer_hashmap = get__hashmap(doc, doc_ID[rand_copy_map_val], 0);
+		hashmap_body_t *copyer_hashmap = get__hashmap(doc, doc_ID[rand_copy_map_val], "");
 		copy__hashmap(new_centroid, copyer_hashmap->map);
 
 		cluster[create_centroid] = malloc(sizeof(cluster_t));
@@ -119,7 +119,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 		// go through non-centroid documents and assign them to centroids
 		for (int find_doc_centroid = 0; find_doc_centroid < *doc_ID_len; find_doc_centroid++) {
 
-			hashmap_body_t *curr_doc = ((hashmap_body_t *) get__hashmap(doc, doc_ID[find_doc_centroid], 0));
+			hashmap_body_t *curr_doc = (hashmap_body_t *) get__hashmap(doc, doc_ID[find_doc_centroid], "");
 			
 			cluster_t *curr_max_centroid = find_closest_cluster(cluster, k, curr_doc);
 
@@ -169,7 +169,7 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 
 		// for each word in cluster, add up tf-idf from each document in cluster and devide by number of documents
 		for (int word_mean = 0; word_mean < *cluster_word_len; word_mean++) {
-			cluster_centroid_data *centroid_tfidf = get__hashmap(centroids[find_mean_centroid]->centroid, cluster_word[word_mean], 0);
+			cluster_centroid_data *centroid_tfidf = get__hashmap(centroids[find_mean_centroid]->centroid, cluster_word[word_mean], "");
 			float mean_tfidf = centroid_tfidf->tf_idf;			
 			centroid_tfidf->tf_idf = 0;
 			centroid_tfidf->doc_freq = 0;
@@ -178,7 +178,7 @@ float *centroid_mean_calculate(cluster_t **centroids, float *mean_shift, int k, 
 			float standard_deviation = 0;
 			for (int check_doc = 0; check_doc < cluster_size; check_doc++) {
 				float *doc_tfidf = (float *) get__hashmap(((hashmap_body_t *) get__hashmap(doc,
-					centroids[find_mean_centroid]->doc_pos[check_doc], 0))->map, cluster_word[word_mean], 0);
+					centroids[find_mean_centroid]->doc_pos[check_doc], ""))->map, cluster_word[word_mean], "");
 
 				if (!doc_tfidf)
 					continue;
@@ -212,7 +212,7 @@ int copy__hashmap(hashmap *m1, hashmap *m2) {
 
 	for (int cp_value = 0; cp_value < *m2_value_len; cp_value++) {
 
-		float m1_value = *(float *) get__hashmap(m2, m2_words[cp_value], 0);
+		float m1_value = *(float *) get__hashmap(m2, m2_words[cp_value], "");
 
 		cluster_centroid_data *new_ccd = create_cluster_centroid_data(m1_value);
 
