@@ -98,9 +98,21 @@ int main() {
 	cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
 
 	// setup database:
-	db = db_connect("SERVER", "USERNAME", "PASSWORD", "DATABASE-NAME");
+	// db = db_connect("SERVER", "USERNAME", "PASSWORD", "DATABASE-NAME");
 
 	int status = app_listen(HOST, PORT, app);
+
+	destroy_cluster(cluster, K);
+	deepdestroy__hashmap(doc_map);
+
+	for (int free_words = 0; free_words < *word_bag_len; free_words++) {
+		free(word_bag[free_words]);
+	}
+
+	free(word_bag_len);
+	free(word_bag);
+
+	// mysql_close(db);
 
 	return 0;
 }
