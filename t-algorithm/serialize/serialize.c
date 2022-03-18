@@ -164,11 +164,11 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 
 		// update full_rep
 		// ID,freq|
-		int freq_len = (int) log10(key_freq) + 2;
+		int freq_len = (int) log10(key_freq) + 3;
 		int length = *ID_len + freq_len;
 
 		// make sure char has enough space
-		while (m_val->full_rep_index + length + 1 > m_val->max_full_rep) {
+		while (m_val->full_rep_index + length + 1 >= m_val->max_full_rep) {
 			m_val->max_full_rep *= 2;
 
 			m_val->full_rep = realloc(m_val->full_rep, sizeof(char) * m_val->max_full_rep);

@@ -117,7 +117,7 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 
 			arr_index++;
 
-			if (arr_index == *arr_len) {
+			while (arr_index >= *arr_len) {
 				*arr_len *= 2;
 				arr = realloc(arr, sizeof(char *) * *arr_len);
 
