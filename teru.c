@@ -115,7 +115,7 @@ int app_listen(char *HOST, char *PORT, teru_t app) {
 	printf("\033[0;32m");
 	printf("...\n\n");
 
-	socket_t *socket = get_socket(HOST, PORT);
+	socket_t *socket = get_socket(HOST, PORT, 1);
 	inferer_map = infer_load();
 
 	if (listen(socket->sock, BACKLOG) == -1) {

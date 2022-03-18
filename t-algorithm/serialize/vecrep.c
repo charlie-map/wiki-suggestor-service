@@ -100,7 +100,7 @@ int http_pull_to_file() {
 		exit(1);
 	}
 
-	socket_t *sock_data = get_socket(HOST, PORT);
+	socket_t *sock_data = get_socket(HOST, PORT, 0);
 
 	// calculating term frequency for each term
 	hashmap *term_freq = make__hashmap(0, NULL, destroy_tf_t);
@@ -139,7 +139,7 @@ int http_pull_to_file() {
 
 		if (create_sock_mutex > 0) {
 			socket_holder[create_sock_mutex] = malloc(sizeof(socket_t *));
-			*(socket_holder[create_sock_mutex]) = get_socket(HOST, PORT);
+			*(socket_holder[create_sock_mutex]) = get_socket(HOST, PORT, 0);
 		}
 	}
 
@@ -279,7 +279,7 @@ void *data_read(void *meta_ptr) {
 			// reset socket:
 
 			destroy_socket(*(ser_pt->sock_data));
-			*(ser_pt->sock_data) = get_socket(HOST, PORT);
+			*(ser_pt->sock_data) = get_socket(HOST, PORT, 0);
 
 			// repeat data collection
 			pthread_mutex_unlock(ser_pt->sock_mutex);

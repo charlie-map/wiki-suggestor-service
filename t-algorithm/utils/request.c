@@ -497,7 +497,8 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 	return res_create(headers, buffer, full_req_len + 1);
 }
 
-socket_t *get_socket(char *HOST, char *PORT) {
+// 0 for client, 1 for server
+socket_t *get_socket(char *HOST, char *PORT, int serv_client) {
 	// connection stuff
 	//int *sock_fd = malloc(sizeof(int)); // listen on sock_fd
 	int sock;
@@ -505,6 +506,7 @@ socket_t *get_socket(char *HOST, char *PORT) {
 	struct sockaddr_storage their_addr; // connector's address information
 	struct sigaction sa;
 
+	int yes = 1;
 	int status;
 
 	memset(&hints, 0, sizeof(hints)); // make sure the struct is empty
@@ -525,13 +527,28 @@ socket_t *get_socket(char *HOST, char *PORT) {
 			exit(1);
 		}
 
-		if (connect(sock, p->ai_addr, p->ai_addrlen) == -1) {
+		if (!serv_client && connect(sock, p->ai_addr, p->ai_addrlen) == -1) {
 			close(sock);
 			perror("client: connect");
 			exit(1);
 		}
 
-		break;
+		if (!serv_client)
+			break;
+
+		if (serv_client && setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
+                sizeof(int)) == -1) {
+            perror("setsockopt");
+            exit(1);
+        }
+
+        if (serv_client && bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+            close(sockfd);
+            perror("server: bind");
+            continue;
+        }
+
+        break;
 	}
 
 	if (p == NULL) {
