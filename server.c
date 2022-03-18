@@ -88,7 +88,7 @@ int main() {
 	app_post(app, "/nn", nearest_neighbor);
 
 	// reset files
-	//http_pull_to_file();
+	http_pull_to_file();
 
 	// create clusters
 	doc_map = deserialize_title("title.txt");

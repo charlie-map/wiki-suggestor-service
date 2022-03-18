@@ -4,3 +4,5 @@ t-algorithm/serialize/stopwords.txt
 t-algorithm/serialize/title.txt
 t-algorithm/stemmer.c
 a.out
+docbags.txt
+title.txt
