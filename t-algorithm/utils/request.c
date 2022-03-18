@@ -536,14 +536,14 @@ socket_t *get_socket(char *HOST, char *PORT, int serv_client) {
 		if (!serv_client)
 			break;
 
-		if (serv_client && setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
+		if (serv_client && setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes,
                 sizeof(int)) == -1) {
             perror("setsockopt");
             exit(1);
         }
 
-        if (serv_client && bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-            close(sockfd);
+        if (serv_client && bind(sock, p->ai_addr, p->ai_addrlen) == -1) {
+            close(sock);
             perror("server: bind");
             continue;
         }

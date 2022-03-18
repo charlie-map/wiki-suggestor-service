@@ -20,7 +20,7 @@ struct MutexPtr {
 	pthread_mutex_t mutex;
 };
 
-socket_t *get_socket(char *HOST, char *PORT);
+socket_t *get_socket(char *HOST, char *PORT, int serv_client);
 int destroy_socket(socket_t *socket_data);
 
 res *send_req(socket_t *sock, char *sub_url, char *type, char *param, ...);
