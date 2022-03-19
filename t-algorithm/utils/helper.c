@@ -3,7 +3,6 @@
 #include <stdarg.h>
 
 #include "helper.h"
-#include "hashmap.h"
 
 void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_size) {
 	while (curr_index >= *max_len) {
@@ -13,12 +12,6 @@ void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_siz
 	}
 	
 	return arr;
-}
-
-void destroy_hashmap_float(void *v) {
-	free((float *) v);
-
-	return;
 }
 
 // create index structure
@@ -103,6 +96,7 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 	int *max_curr_sub_word = malloc(sizeof(int)), curr_sub_word_index = 0;
 	*max_curr_sub_word = 8;
 	arr[arr_index] = malloc(sizeof(char) * *max_curr_sub_word);
+	arr[arr_index][0] = '\0';
 
 	for (int read_string = 0; full_string[read_string]; read_string++) {
 		if ((is_delim && is_delim(full_string[read_string], multi_delims)) || full_string[read_string] == delimeter) { // next phrase
@@ -134,19 +128,17 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 		}
 
 		// if not in range, skip:
-		if (!is_range(full_string[read_string]))
+		if (is_range && !is_range(full_string[read_string]))
 			continue;
 
 		// if a capital letter, lowercase
 		if ((int) full_string[read_string] <= 90 && (int) full_string[read_string] >= 65)
 			full_string[read_string] = (char) ((int) full_string[read_string] + 32);
 
-		arr[arr_index][curr_sub_word_index++] = full_string[read_string];
+		arr[arr_index][curr_sub_word_index] = full_string[read_string];
+		curr_sub_word_index++;
 
-		if (curr_sub_word_index == *max_curr_sub_word) {
-			*max_curr_sub_word *= 2;
-			arr[arr_index] = realloc(arr[arr_index], sizeof(char *) * *max_curr_sub_word);
-		}
+		arr[arr_index] = resize_array(arr[arr_index], max_curr_sub_word, curr_sub_word_index, sizeof(char));
 
 		arr[arr_index][curr_sub_word_index] = '\0';
 	}
@@ -155,7 +147,8 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 		free(arr[arr_index]);
 
 		arr_index--;
-	}
+	} else if (minor_length)
+			(*minor_length)[arr_index] = curr_sub_word_index;
 
 	*arr_len = arr_index + 1;
 

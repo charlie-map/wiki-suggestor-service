@@ -97,7 +97,8 @@ int main() {
 	int *word_bag_len = malloc(sizeof(int));
 	char **word_bag = deserialize("docbags.txt", doc_map, word_bag_len);
 
-	cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
+	// cluster = cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
+	cluster = deserialize_cluster("t-algorithm/nearest-neighbor/cluster.txt", K, doc_map, word_bag, word_bag_len);
 
 	// setup database:
 	// db = db_connect("SERVER", "USERNAME", "PASSWORD", "DATABASE-NAME");

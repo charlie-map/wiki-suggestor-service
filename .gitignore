@@ -2,6 +2,7 @@ t-algorithm/serialize/.env
 t-algorithm/serialize/predocbags.txt
 t-algorithm/serialize/stopwords.txt
 t-algorithm/serialize/title.txt
+t-algorithm/nearest-neighbor/cluster.txt
 t-algorithm/stemmer.c
 a.out
 docbags.txt

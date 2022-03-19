@@ -119,7 +119,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 		// go through non-centroid documents and assign them to centroids
 		for (int find_doc_centroid = 0; find_doc_centroid < *doc_ID_len; find_doc_centroid++) {
 
-			hashmap_body_t *curr_doc = (hashmap_body_t *) get__hashmap(doc, doc_ID[find_doc_centroid], "");
+			hashmap_body_t *curr_doc = ((hashmap_body_t *) get__hashmap(doc, doc_ID[find_doc_centroid], ""));
 			
 			cluster_t *curr_max_centroid = find_closest_cluster(cluster, k, curr_doc);
 
@@ -241,4 +241,39 @@ cluster_t *find_closest_cluster(cluster_t **cluster, int k, hashmap_body_t *doc)
 	}
 
 	return cluster[max_centroid];
+}
+
+ /*
+	Pattern for serialization will be:
+
+	cluster_mag doc_amount:doc_id,doc_id,doc_id,
+	...
+	...
+*/
+int cluster_to_file(cluster_t **cluster, int k, char *filename) {
+	FILE *reader_file = fopen(filename, "w");
+
+	if (!reader_file) {
+		printf("\033[0;31m");
+		printf("\n** Error opening file **\n");
+		printf("\033[0;37m");
+	}
+
+	// for each cluster
+	cluster_t *curr_cluster;
+	for (int serialize_cluster = 0; serialize_cluster < k; serialize_cluster++) {
+		curr_cluster = cluster[serialize_cluster];
+
+		fprintf(reader_file, "%1.8f %d:", curr_cluster->sqrt_mag, curr_cluster->doc_pos_index);
+
+		for (int read_doc = 0; read_doc < curr_cluster->doc_pos_index; read_doc++) {
+			fprintf(reader_file, "%s,", curr_cluster->doc_pos[read_doc]);
+		}
+
+		fputc('\n', reader_file);
+	}
+
+	fclose(reader_file);
+
+	return 0;
 }
