@@ -77,9 +77,11 @@ void nearest_neighbor(req_t req, res_t res) {
 	// search for most relavant document:
 	hashmap_body_t *return_doc = kdtree_search(cluster_rep, d_1, curr_doc);
 
-	printf("closest doc: %s\n", return_doc->title);
+	db_r = db_query(db, "SELECT unique_id FROM page WHERE id=?", return_doc->id);
 
-	res_end(res, return_doc->title);
+	res_end(res, (char *) get__hashmap(db_r->row__data[0], "unique_id", ""));
+
+	db_res_destroy(db_r);
 
 	return;
 }
@@ -98,6 +100,7 @@ int main() {
 	char **word_bag = deserialize("docbags.txt", doc_map, word_bag_len);
 
 	// cluster = cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
+	// cluster_to_file(cluster, K, "cluster.txt");
 	cluster = deserialize_cluster("t-algorithm/nearest-neighbor/cluster.txt", K, doc_map, word_bag, word_bag_len);
 
 	// setup database:
