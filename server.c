@@ -35,8 +35,10 @@ hashmap *dimensions;
 char **build_dimensions(cluster_t *curr_cluster);
 
 void nearest_neighbor(req_t req, res_t res) {
+	printf("new request\n");
 	// grab unique ID from body
 	char *unique_id = (char *) req_body(req, "unique-id");
+	printf("%s\n", unique_id);
 
 	// take unique_id and search for the internal id from the database
 	db_res *db_r = db_query(db, "SELECT id FROM page WHERE unique_id=?", unique_id);
@@ -88,7 +90,7 @@ int main() {
 	app_post(app, "/nn", nearest_neighbor);
 
 	// reset files
-	http_pull_to_file();
+	// http_pull_to_file();
 
 	// create clusters
 	doc_map = deserialize_title("title.txt");

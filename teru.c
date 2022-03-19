@@ -386,7 +386,7 @@ int read_query(char *query, int curr_point, hashmap *header_ptr) {
 		 *query_value = malloc(sizeof(char) * *query_value_max);
 	int read_key = 1;
 
-	while (query[curr_point] != ' ') {
+	while (query[curr_point] != ' ' && query[curr_point] != '\n') {
 		if (query[curr_point] == '&') {
 			insert__hashmap(header_ptr, query_key, query_value, "", compareCharKey, destroyCharKey);
 
