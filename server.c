@@ -4,6 +4,7 @@
 
 // add connections to t-algorithm:
 #include "t-algorithm/serialize/vecrep.h"
+#include "t-algorithm/serialize/token.c"
 #include "t-algorithm/nearest-neighbor/kd-tree.h"
 #include "t-algorithm/nearest-neighbor/k-means.h"
 #include "t-algorithm/nearest-neighbor/deserialize.h"
@@ -79,7 +80,16 @@ void nearest_neighbor(req_t req, res_t res) {
 
 	db_r = db_query(db, "SELECT page_name FROM page WHERE id=?", return_doc->id);
 
-	res_end(res, (char *) get__hashmap(db_r->row__data[0], "page_name", ""));
+	char *page_name_tag = (char *) get__hashmap(db_r->row__data[0], "page_name", "");
+	
+	token_t *page_token = tokenize('s', page_name_tag, "");
+
+	int *page_name_len = malloc(sizeof(int));
+	char *page_name = token_read_all_data(page_token, page_name_len, NULL, NULL);
+
+	printf("page: %s\n");
+
+	res_end(res, page_name);
 
 	db_res_destroy(db_r);
 
