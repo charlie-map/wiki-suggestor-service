@@ -269,7 +269,7 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 	hashmap *headers = make__hashmap(0, NULL, NULL);
 	insert__hashmap(headers, "Access-Control-Allow-Origin", "*", "", compareCharKey, NULL);
 	insert__hashmap(headers, "Connection", "Keep-Alive", "", compareCharKey, NULL);
-	
+
 	va_list read_opts;
 	va_start(read_opts, options);
 
@@ -387,7 +387,7 @@ int read_query(char *query, int curr_point, hashmap *header_ptr, int content_len
 	int read_key = 1;
 
 	while ((query[curr_point] != ' ' && query[curr_point] != '\n') &&
-			(content_length == 0 || curr_point < content_length)) {
+		(content_length == 0 || curr_point < content_length)) {
 		if (query[curr_point] == '&') {
 			insert__hashmap(header_ptr, query_key, query_value, "", compareCharKey, destroyCharKey);
 
