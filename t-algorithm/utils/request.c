@@ -260,10 +260,10 @@ char *create_header_server(int STATUS, int *header_max, hashmap *status_code, ha
 	free(key_num);
 	free(header_key);
 
-	header = resize_array(header, header_max, header_index + 3, sizeof(char));
+	header = resize_array(header, header_max, header_index + 2, sizeof(char));
 
-	strcat(header, "\n\n");
-	*header_max = header_index + 3;
+	strcat(header, "\n");
+	*header_max = header_index + 2;
 
 	return header;
 }

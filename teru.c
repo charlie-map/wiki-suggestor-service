@@ -312,12 +312,12 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 
 	// send header
 	int bytes_sent = 0;
-	printf("send header %d: %s\n", *head_msg_len, main_head_msg);
-	while ((bytes_sent = send(sock, main_head_msg + bytes_sent, *head_msg_len - bytes_sent / sizeof(char), 0)) < sizeof(char) * *head_msg_len);
+	*head_msg_len += data_length ? data_length - 1 : 0;
+	main_head_msg = realloc(main_head_msg, sizeof(char) * *head_msg_len);
 
-	// if data, send body of message
-	bytes_sent = 0;
-	while ((bytes_sent = send(sock, data + bytes_sent, data_length - bytes_sent, 0)) < data_length);
+	strcat(main_head_msg, data);
+	printf("%d: %s\n", *head_msg_len, main_head_msg);
+	while ((bytes_sent = send(sock, main_head_msg + bytes_sent, *head_msg_len - bytes_sent / sizeof(char), 0)) < sizeof(char) * *head_msg_len);
 
 	free(head_msg_len);
 	if (lengthOf_data_length) free(lengthOf_data_length);

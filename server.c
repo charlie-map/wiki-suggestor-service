@@ -77,9 +77,9 @@ void nearest_neighbor(req_t req, res_t res) {
 	// search for most relavant document:
 	hashmap_body_t *return_doc = kdtree_search(cluster_rep, d_1, curr_doc);
 
-	db_r = db_query(db, "SELECT unique_id FROM page WHERE id=?", return_doc->id);
+	db_r = db_query(db, "SELECT page_name FROM page WHERE id=?", return_doc->id);
 
-	res_end(res, (char *) get__hashmap(db_r->row__data[0], "unique_id", ""));
+	res_end(res, (char *) get__hashmap(db_r->row__data[0], "page_name", ""));
 
 	db_res_destroy(db_r);
 
