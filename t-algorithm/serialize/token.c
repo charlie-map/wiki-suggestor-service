@@ -325,12 +325,9 @@ int read_newline(char **curr_line, size_t *buffer_size, FILE *fp, char *str_read
 		return getdelim(curr_line, buffer_size, 10, fp);
 
 	// otherwise search through str_read for a newline
-	int str_read_index = -1;
+	int str_read_index = 0;
 
 	while (str_read[0] != '\0') {
-		if (str_read_index == -1)
-			str_read_index = 0;
-
 		if (str_read[0] == '\n')
 			break;
 
@@ -349,13 +346,13 @@ int read_newline(char **curr_line, size_t *buffer_size, FILE *fp, char *str_read
 		(*curr_line)[str_read_index] = '\0';
 	}
 
-	if (str_read_index == -1)
-		return str_read_index;
+	if (str_read[0] == '\0' && str_read_index == 0)
+		return -1;
 
 	(*curr_line)[str_read_index] = '\n';
 	(*curr_line)[str_read_index + 1] = '\0';
 
-	return str_read_index + 1;
+	return str_read_index + (str_read[0] == '\0');
 }
 
 int find_close_tag(FILE *file, char *str_read, char **curr_line, size_t *buffer_size, int search_close) {
