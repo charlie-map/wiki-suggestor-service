@@ -355,7 +355,7 @@ int read_newline(char **curr_line, size_t *buffer_size, FILE *fp, char *str_read
 	(*curr_line)[str_read_index] = '\n';
 	(*curr_line)[str_read_index + 1] = '\0';
 
-	return str_read_index;
+	return str_read_index + 1;
 }
 
 int find_close_tag(FILE *file, char *str_read, char **curr_line, size_t *buffer_size, int search_close) {

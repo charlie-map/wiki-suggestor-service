@@ -101,16 +101,16 @@ int main() {
 	app_post(app, "/nn", nearest_neighbor);
 
 	// reset files
-	// http_pull_to_file();
+	http_pull_to_file();
 
 	// create clusters
 	doc_map = deserialize_title("title.txt");
 	int *word_bag_len = malloc(sizeof(int));
 	char **word_bag = deserialize("docbags.txt", doc_map, word_bag_len);
 
-	// cluster = cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
-	// cluster_to_file(cluster, K, "cluster.txt");
-	cluster = deserialize_cluster("cluster.txt", K, doc_map, word_bag, word_bag_len);
+	cluster = cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
+	cluster_to_file(cluster, K, "cluster.txt");
+	// cluster = deserialize_cluster("cluster.txt", K, doc_map, word_bag, word_bag_len);
 
 	// setup database:
 	// db = db_connect("SERVER", "USERNAME", "PASSWORD", "DATABASE-NAME");
