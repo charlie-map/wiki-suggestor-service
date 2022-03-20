@@ -287,7 +287,7 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 		} else if (options[check_option + 1] == 'i') {
 			char *file_data_name = va_arg(read_opts, char *);
 			data = va_arg(read_opts, char *);
-			data_length = va_arg(read_opts, int) + 1;
+			data_length = va_arg(read_opts, int);
 
 			char *content_type = content_type_infer(inferer_map, file_data_name, data, data_length);
 
@@ -316,7 +316,7 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 	main_head_msg = realloc(main_head_msg, sizeof(char) * *head_msg_len);
 
 	strcat(main_head_msg, data);
-	printf("%d: %s\n", *head_msg_len, main_head_msg);
+	printf("%d: %s", *head_msg_len, main_head_msg);
 	while ((bytes_sent = send(sock, main_head_msg + bytes_sent, *head_msg_len - bytes_sent / sizeof(char), 0)) < sizeof(char) * *head_msg_len);
 
 	free(head_msg_len);

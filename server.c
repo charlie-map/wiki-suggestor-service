@@ -4,7 +4,7 @@
 
 // add connections to t-algorithm:
 #include "t-algorithm/serialize/vecrep.h"
-#include "t-algorithm/serialize/token.c"
+#include "t-algorithm/serialize/token.h"
 #include "t-algorithm/nearest-neighbor/kd-tree.h"
 #include "t-algorithm/nearest-neighbor/k-means.h"
 #include "t-algorithm/nearest-neighbor/deserialize.h"

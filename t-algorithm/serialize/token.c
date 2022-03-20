@@ -331,7 +331,7 @@ int read_newline(char **curr_line, size_t *buffer_size, FILE *fp, char *str_read
 		if (str_read_index == -1)
 			str_read_index = 0;
 
-		if ((int) *str_read == 10)
+		if ((int) *str_read == 10 || (int) *str_read == 0)
 			break;
 
 		(*curr_line)[str_read_index] = *str_read;
