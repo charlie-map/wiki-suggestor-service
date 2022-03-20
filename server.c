@@ -39,7 +39,6 @@ void nearest_neighbor(req_t req, res_t res) {
 	printf("new request\n");
 	// grab unique ID from body
 	char *unique_id = (char *) req_body(req, "unique-id");
-	printf("%s\n", unique_id);
 
 	// take unique_id and search for the internal id from the database
 	db_res *db_r = db_query(db, "SELECT id FROM page WHERE unique_id=?", unique_id);
@@ -78,19 +77,29 @@ void nearest_neighbor(req_t req, res_t res) {
 	// search for most relavant document:
 	hashmap_body_t *return_doc = kdtree_search(cluster_rep, d_1, curr_doc);
 
+	db_res_destroy(db_r);
 	db_r = db_query(db, "SELECT page_name FROM page WHERE id=?", return_doc->id);
 
 	char *page_name_tag = (char *) get__hashmap(db_r->row__data[0], "page_name", "");
-	
+	printf("get page: %s\n", page_name_tag);
+
 	token_t *page_token = tokenize('s', page_name_tag, "");
 
 	int *page_name_len = malloc(sizeof(int));
 	char *page_name = token_read_all_data(page_token, page_name_len, NULL, NULL);
 
-	printf("page: %s\n");
+	free(page_name_len);
+
+	printf("page: %s\n", page_name);
 
 	res_end(res, page_name);
+	free(page_name);
 
+	free(dimension_charset);
+	free(cluster_docs);
+
+	destroy_token(page_token);
+	kdtree_destroy(cluster_rep);
 	db_res_destroy(db_r);
 
 	return;
@@ -111,7 +120,7 @@ int main() {
 
 	// cluster = cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
 	// cluster_to_file(cluster, K, "cluster.txt");
-	cluster = deserialize_cluster("t-algorithm/nearest-neighbor/cluster.txt", K, doc_map, word_bag, word_bag_len);
+	cluster = deserialize_cluster("cluster.txt", K, doc_map, word_bag, word_bag_len);
 
 	// setup database:
 	// db = db_connect("SERVER", "USERNAME", "PASSWORD", "DATABASE-NAME");

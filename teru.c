@@ -283,7 +283,7 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 			insert__hashmap(headers, "Content-Type", "text/plain", "", compareCharKey, NULL);
 
 			data = va_arg(read_opts, char *);
-			data_length = strlen(data) + 1;
+			data_length = strlen(data);
 		} else if (options[check_option + 1] == 'i') {
 			char *file_data_name = va_arg(read_opts, char *);
 			data = va_arg(read_opts, char *);
@@ -303,7 +303,7 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 	char *lengthOf_data_length = NULL;
 	if (data_length) {
 		lengthOf_data_length = malloc(sizeof(char) * ((int) log10(data_length) + 2));
-		sprintf(lengthOf_data_length, "%d", data_length);
+		sprintf(lengthOf_data_length, "%d", data_length - 1);
 		insert__hashmap(headers, "Content-Length", lengthOf_data_length, "", compareCharKey, NULL);
 	}
 
@@ -312,7 +312,7 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 
 	// send header
 	int bytes_sent = 0;
-	*head_msg_len += data_length ? data_length - 1 : 0;
+	*head_msg_len += data_length ? data_length : 0;
 	main_head_msg = realloc(main_head_msg, sizeof(char) * *head_msg_len);
 
 	strcat(main_head_msg, data);
