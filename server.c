@@ -36,15 +36,18 @@ hashmap *dimensions;
 char **build_dimensions(cluster_t *curr_cluster);
 
 void nearest_neighbor(req_t req, res_t res) {
-	printf("new request\n");
 	// grab unique ID from body
 	char *unique_id = (char *) req_body(req, "unique-id");
 
 	// take unique_id and search for the internal id from the database
 	db_res *db_r = db_query(db, "SELECT id FROM page WHERE unique_id=?", unique_id);
 
-	if (!db_r->row_count)
+	if (!db_r->row_count) {
+		db_res_destroy(db_r);
+
 		res_end(res, "No page");
+		return;
+	}
 
 	hashmap_body_t *curr_doc = get__hashmap(doc_map, (char *) get__hashmap(db_r->row__data[0], "id", ""), "");
 
@@ -52,16 +55,6 @@ void nearest_neighbor(req_t req, res_t res) {
 
 	char **dimension_charset = build_dimensions(closest_cluster);
 	char *d_1 = dimension_charset[0];
-
-	printf("\nbest dimensions: \n");
-	char *d_checker = d_1;
-	for (int read_dimensions = 0; read_dimensions < 10; read_dimensions++) {
-		int best_doc_freq = ((cluster_centroid_data *) get__hashmap(closest_cluster->centroid, d_checker, ""))->doc_freq;
-
-		printf("Dim %d: %s -- doc freq: %d\n", read_dimensions, d_checker, best_doc_freq);
-
-		d_checker = (char *) get__hashmap(dimensions, d_checker, "");
-	}
 
 	// build array of documents within the closest cluster:
 	hashmap_body_t **cluster_docs = malloc(sizeof(hashmap_body_t *) * closest_cluster->doc_pos_index);
@@ -81,7 +74,6 @@ void nearest_neighbor(req_t req, res_t res) {
 	db_r = db_query(db, "SELECT page_name FROM page WHERE id=?", return_doc->id);
 
 	char *page_name_tag = (char *) get__hashmap(db_r->row__data[0], "page_name", "");
-	printf("get page: %s\n", page_name_tag);
 
 	token_t *page_token = tokenize('s', page_name_tag, "");
 
@@ -89,8 +81,6 @@ void nearest_neighbor(req_t req, res_t res) {
 	char *page_name = token_read_all_data(page_token, page_name_len, NULL, NULL);
 
 	free(page_name_len);
-
-	printf("page: %s\n", page_name);
 
 	res_end(res, page_name);
 	free(page_name);
@@ -144,7 +134,6 @@ int main() {
 
 char **build_dimensions(cluster_t *curr_cluster) {
 	float cluster_size = log(curr_cluster->doc_pos_index) + 1;
-	printf("dimension picks %1.3f\n", cluster_size);
 
 	int *key_length = malloc(sizeof(int));
 	char **keys = (char **) keys__hashmap(curr_cluster->centroid, key_length, "");

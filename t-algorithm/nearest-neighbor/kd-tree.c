@@ -126,10 +126,6 @@ int quicksort(kdtree_t *k_t, kd_node_t *k_node, void ***members, void *dimension
 		return 0;
 
 	full_sort_dimension(k_t, members, dimension, low, high);
-	printf("QUICKY DIMENSION CHECK\n");
-	for (int read_thru = low; read_thru < high + 1; read_thru++) {
-		printf("%d: %s\n", read_thru, ((hashmap_body_t *) members[read_thru])->title);
-	}
 
 	// grab middle value
 	int pivot = (low + high) * 0.5;
@@ -266,18 +262,8 @@ void *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, vo
 	// based on return payload, make some comparisons to see what to do next:
 	// check the split payload againt the best payload in the current dimension
 
-	tabs(depth);
-	printf("Running docs node %s - curr %s - search %s\n",
-		((hashmap_body_t *) k_node->payload)->title, ((hashmap_body_t *) curr_best)->title,
-		((hashmap_body_t *) kd_payload)->title);
-
 	float curr_best_v_node_distance = k_t->distance(node_payload, curr_best_payload);
 	float curr_best_v_search_distance = k_t->distance(search_payload, curr_best_payload);
-
-	tabs(depth);
-	printf("node curr dist: %1.3f\n", curr_best_v_node_distance);
-	tabs(depth);
-	printf("search curr dist: %1.3f\n", curr_best_v_search_distance);
 
 	if (node_payload == search_payload)
 		return curr_best;

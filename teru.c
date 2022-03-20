@@ -269,7 +269,7 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 	hashmap *headers = make__hashmap(0, NULL, NULL);
 	insert__hashmap(headers, "Access-Control-Allow-Origin", "*", "", compareCharKey, NULL);
 	insert__hashmap(headers, "Connection", "Keep-Alive", "", compareCharKey, NULL);
-	
+
 	va_list read_opts;
 	va_start(read_opts, options);
 
@@ -303,7 +303,7 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 	char *lengthOf_data_length = NULL;
 	if (data_length) {
 		lengthOf_data_length = malloc(sizeof(char) * ((int) log10(data_length) + 2));
-		sprintf(lengthOf_data_length, "%d", data_length - 1);
+		sprintf(lengthOf_data_length, "%d", data_length);
 		insert__hashmap(headers, "Content-Length", lengthOf_data_length, "", compareCharKey, NULL);
 	}
 
@@ -316,7 +316,6 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 	main_head_msg = realloc(main_head_msg, sizeof(char) * *head_msg_len);
 
 	strcat(main_head_msg, data);
-	printf("%d: %s", *head_msg_len, main_head_msg);
 	while ((bytes_sent = send(sock, main_head_msg + bytes_sent, *head_msg_len - bytes_sent / sizeof(char), 0)) < sizeof(char) * *head_msg_len);
 
 	free(head_msg_len);
@@ -375,7 +374,8 @@ void print_header(void *h) {
 }
 
 /* assumes the form name=Charlie&age=18&etc. */
-int read_query(char *query, int curr_point, hashmap *header_ptr) {
+/* content_length not require */
+int read_query(char *query, int curr_point, hashmap *header_ptr, int content_length) {
 	// setup key and value pointers
 	int *query_key_max = malloc(sizeof(int)), query_key_index = 0,
 		*query_value_max = malloc(sizeof(int)), query_value_index = 0;
@@ -386,7 +386,8 @@ int read_query(char *query, int curr_point, hashmap *header_ptr) {
 		 *query_value = malloc(sizeof(char) * *query_value_max);
 	int read_key = 1;
 
-	while (query[curr_point] != ' ' && query[curr_point] != '\n') {
+	while ((query[curr_point] != ' ' && query[curr_point] != '\n') &&
+		(content_length == 0 || curr_point < content_length)) {
 		if (query[curr_point] == '&') {
 			insert__hashmap(header_ptr, query_key, query_value, "", compareCharKey, destroyCharKey);
 
@@ -438,7 +439,7 @@ int read_url(char **url, int *url_max, int url_index, char *header_str, req_t *m
 
 			mp_h->query_map = make__hashmap(0, print_header, destroyCharKey);
 
-			read_char += read_query(header_str + sizeof(char) * (read_char + 1), 0, mp_h->query_map);
+			read_char += read_query(header_str + sizeof(char) * (read_char + 1), 0, mp_h->query_map, 0);
 
 			continue;
 		}
@@ -522,7 +523,8 @@ req_t *read_header_helper(char *header_str, int header_length) {
 	if (strcmp(mp_h->type, "POST") == 0) {
 		mp_h->body_map = make__hashmap(0, print_header, destroyCharKey);
 
-		read_query(header_str + sizeof(char) * *header_end_pos, 0, mp_h->body_map);
+		int content_length = atoi((char *) get__hashmap(mp_h->meta_header_map, "Content-Length", ""));
+		read_query(header_str + sizeof(char) * *header_end_pos, 0, mp_h->body_map, content_length);
 	}
 
 	free(header_end_pos);
