@@ -26,7 +26,8 @@ void destroy_tf_t(void *tf);
 
 int delimeter_check(char curr_char, char *delims);
 
-int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token_t *full_page, char **ID);
+int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
+	token_t *full_page, char **ID, hashmap_body_t *opt_doc);
 
 void destroy_hashmap_val(void *ptr);
 void destroy_hashmap_float(void *v);

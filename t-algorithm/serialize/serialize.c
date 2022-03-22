@@ -58,19 +58,24 @@ int is_m(void *tf, void *extra) {
 	Now index_fp, title_fp, and idf_hash need mutex locking,
 	so bring mutex attr with them
 */
-int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token_t *full_page, char **ID) {
+int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
+	token_t *full_page, char **ID, hashmap_body_t *opt_doc) {
 	int total_bag_size = 0;
 
 	// create title page:
 	// get ID
 	int *ID_len = malloc(sizeof(int));
 	*ID = token_read_all_data(grab_token_by_tag(full_page, "id"), ID_len, NULL, NULL);
+	if (opt_doc)
+		opt_doc->id = *ID;
 
 	total_bag_size += *ID_len - 1;
 
 	// get title
 	int *title_len = malloc(sizeof(int));
 	char *title = token_read_all_data(grab_token_by_tag(full_page, "title"), title_len, NULL, NULL);
+	if (opt_doc)
+		opt_doc->title = title;
 
 	// write to title_fp
 	pthread_mutex_lock(&(title_fp->mutex));
@@ -139,6 +144,13 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie, token
 				hashmap_freq->curr_doc_id = *ID;
 
 				hashmap_freq->doc_freq++;
+
+				// setup hashmap_body_t if there
+				if (opt_doc) {
+					float *new_map_value = 0;
+
+					// badlands...
+				}
 			}
 
 			continue;

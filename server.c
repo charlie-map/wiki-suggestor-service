@@ -70,15 +70,20 @@ void nearest_neighbor(req_t req, res_t res) {
 
 		token_t *token_wiki_page = tokenize('s', (char *) get__hashmap(db_wiki_page->row__data[0], "wiki_page", ""), "");
 
+		curr_doc = create_hashmap_body(NULL, NULL, NULL);
+
 		pthread_mutex_lock(&(term_freq->mutex));
 		pthread_mutex_lock(&ID_mutex);
-		word_bag((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]));
+		word_bag((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), curr_doc);
 		pthread_mutex_unlock(&(term_freq->mutex));
 
 		ID_index++;
 		ID = resize_array(ID, ID_len, ID_index, sizeof(char *));
 
-		pthread_mutex_unlock(&ID_mutex);		
+		pthread_mutex_unlock(&ID_mutex);
+
+		// now take NEWLY BUILT WIKI HASHMAP (need) and find closest cluster
+
 	}
 
 	cluster_t *closest_cluster = find_closest_cluster(cluster, K, curr_doc);
@@ -146,6 +151,7 @@ int main() {
 	char **word_bag = deserialize("docbags.txt", term_freq_map, doc_map, word_bag_len);
 
 	FILE *title_writer = fopen("title.txt", "w");
+	fseek(title_writer, 0, SEEK_END);
 	if (!title_writer) {
 		printf("\033[0;31m");
 		printf("\n** Error opening file **\n");
