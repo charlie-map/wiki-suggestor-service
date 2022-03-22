@@ -4,9 +4,7 @@
 #include "k-means.h"
 #include "../utils/hashmap.h"
 
-hashmap_body_t *create_hashmap_body(char *id, char *title, float mag);
-void destroy_hashmap_body(hashmap_body_t *body_hash);
-
+void hm_destroy_hashmap_body(void *hm_body);
 int deserialize_title(char *title_reader, hashmap *doc_map, char ***ID, int *ID_len);
 
 char **deserialize(char *index_reader, hashmap *term_freq, hashmap *docs, int *max_words);

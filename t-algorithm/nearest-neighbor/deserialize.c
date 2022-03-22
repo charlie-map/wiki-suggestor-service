@@ -4,39 +4,12 @@
 #include <math.h>
 
 #include "deserialize.h"
+#include "document-vector.h"
 #include "../utils/helper.h"
 #include "../serialize/serialize.h"
 
-void destroy_hashmap_float(void *v) {
-	free((float *) v);
-
-	return;
-}
-
-hashmap_body_t *create_hashmap_body(char *id, char *title, float mag) {
-	hashmap_body_t *hm = (hashmap_body_t *) malloc(sizeof(hashmap_body_t));
-
-	hm->title = title;
-
-	hm->mag = mag;
-	hm->sqrt_mag = sqrt(mag);
-
-	hm->map = make__hashmap(0, NULL, destroy_hashmap_float);
-
-	return hm;
-}
-
-void destroy_hashmap_body(hashmap_body_t *body_hash) {
-	free(body_hash->title);
-
-	deepdestroy__hashmap(body_hash->map);
-
-	free(body_hash);
-	return;
-}
-
 void hm_destroy_hashmap_body(void *hm_body) {
-	return destroy_hashmap_body((hashmap_body_t *) hm_body);
+	return destroy_hashmap_body((document_vector_t *) hm_body);
 }
 
 int deserialize_title(char *title_reader, hashmap *doc_map, char ***ID, int *ID_len) {
@@ -156,7 +129,7 @@ char **deserialize(char *index_reader, hashmap *term_freq, hashmap *docs, int *m
 		insert__hashmap(term_freq, words[words_index], "", compareCharKey, NULL);
 
 		for (int read_doc_freq = 2; read_doc_freq < *line_sub_max; read_doc_freq += 2) {
-			hashmap_body_t *doc = get__hashmap(docs, line_subs[read_doc_freq], "");
+			document_vector_t *doc = get__hashmap(docs, line_subs[read_doc_freq], "");
 			free(line_subs[read_doc_freq]);
 
 			// calculate term_frequency / document_frequency
@@ -237,7 +210,7 @@ cluster_t **deserialize_cluster(char *filename, int k, hashmap *doc_map, char **
 
 			doc_pos[read_doc] = doc_key;
 
-			hashmap_body_t *curr_doc = get__hashmap(doc_map, doc_key, "");
+			document_vector_t *curr_doc = get__hashmap(doc_map, doc_key, "");
 
 			// look at all keys in the document
 			char **curr_doc_keys = (char **) keys__hashmap(curr_doc->map, doc_key_len, "");

@@ -59,7 +59,7 @@ int is_m(void *tf, void *extra) {
 	so bring mutex attr with them
 */
 int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
-	token_t *full_page, char **ID, hashmap_body_t *opt_doc) {
+	token_t *full_page, char **ID, document_vector_t *opt_doc) {
 	int total_bag_size = 0;
 
 	// create title page:
@@ -137,19 +137,27 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 
 			free(full_page_data[add_hash]);
 
-			if (strcmp(*ID, hashmap_freq->curr_doc_id) == 0)
+			if (strcmp(*ID, hashmap_freq->curr_doc_id) == 0) {
 				hashmap_freq->curr_term_freq++;
-			else { // reset features
+
+				if (opt_doc) {
+					float *opt_map_value = get__hashmap(opt_doc->map, full_page_data[add_hash], "");
+
+					if (opt_map_value)
+						*opt_map_value++;
+				}
+			} else { // reset features
 				hashmap_freq->curr_term_freq = 1;
 				hashmap_freq->curr_doc_id = *ID;
 
 				hashmap_freq->doc_freq++;
 
-				// setup hashmap_body_t if there
+				// setup document_vector_t if there
 				if (opt_doc) {
-					float *new_map_value = 0;
-
-					// badlands...
+					float *new_opt_map_value = malloc(sizeof(float));
+					*new_opt_map_value = 1;
+					
+					insert__hashmap(opt_doc->map, full_page_data[add_hash], new_opt_map_value, "", compareCharKey, NULL);
 				}
 			}
 

@@ -10,6 +10,7 @@
 #include "t-algorithm/nearest-neighbor/kd-tree.h"
 #include "t-algorithm/nearest-neighbor/k-means.h"
 #include "t-algorithm/nearest-neighbor/deserialize.h"
+#include "t-algorithm/nearest-neighbor/document-vector.h"
 #include "t-algorithm/utils/hashmap.h"
 #include "t-algorithm/utils/helper.h"
 
@@ -62,7 +63,7 @@ void nearest_neighbor(req_t req, res_t res) {
 	}
 
 	char *curr_docID = (char *) get__hashmap(db_r->row__data[0], "id", "");
-	hashmap_body_t *curr_doc = get__hashmap(doc_map, curr_docID, "");
+	document_vector_t *curr_doc = get__hashmap(doc_map, curr_docID, "");
 
 	// document exists, but has not been serialized into the current document map
 	if (!curr_doc) {
@@ -70,7 +71,7 @@ void nearest_neighbor(req_t req, res_t res) {
 
 		token_t *token_wiki_page = tokenize('s', (char *) get__hashmap(db_wiki_page->row__data[0], "wiki_page", ""), "");
 
-		curr_doc = create_hashmap_body(NULL, NULL, NULL);
+		curr_doc = create_hashmap_body(NULL, NULL, 0);
 
 		pthread_mutex_lock(&(term_freq->mutex));
 		pthread_mutex_lock(&ID_mutex);
@@ -82,8 +83,7 @@ void nearest_neighbor(req_t req, res_t res) {
 
 		pthread_mutex_unlock(&ID_mutex);
 
-		// now take NEWLY BUILT WIKI HASHMAP (need) and find closest cluster
-
+		// curr doc now holds all the data which the next steps need
 	}
 
 	cluster_t *closest_cluster = find_closest_cluster(cluster, K, curr_doc);
@@ -92,9 +92,9 @@ void nearest_neighbor(req_t req, res_t res) {
 	char *d_1 = dimension_charset[0];
 
 	// build array of documents within the closest cluster:
-	hashmap_body_t **cluster_docs = malloc(sizeof(hashmap_body_t *) * closest_cluster->doc_pos_index);
+	document_vector_t **cluster_docs = malloc(sizeof(document_vector_t *) * closest_cluster->doc_pos_index);
 	for (int pull_cluster_doc = 0; pull_cluster_doc < closest_cluster->doc_pos_index; pull_cluster_doc++) {
-		cluster_docs[pull_cluster_doc] = (hashmap_body_t *) get__hashmap(doc_map, closest_cluster->doc_pos[pull_cluster_doc], "");
+		cluster_docs[pull_cluster_doc] = (document_vector_t *) get__hashmap(doc_map, closest_cluster->doc_pos[pull_cluster_doc], "");
 	}
 
 	kdtree_t *cluster_rep = kdtree_create(weight, member_extract, d_1, next_dimension, distance, meta_distance);
@@ -103,7 +103,7 @@ void nearest_neighbor(req_t req, res_t res) {
 	kdtree_load(cluster_rep, (void ***) cluster_docs, closest_cluster->doc_pos_index);
 
 	// search for most relavant document:
-	hashmap_body_t *return_doc = kdtree_search(cluster_rep, d_1, curr_doc);
+	document_vector_t *return_doc = kdtree_search(cluster_rep, d_1, curr_doc);
 
 	db_res_destroy(db_r);
 	db_r = db_query(db, "SELECT page_name FROM page WHERE id=?", return_doc->id);
@@ -263,8 +263,8 @@ float distance(void *map1_val, void *map2_val) {
 }
 
 float meta_distance(void *map1_body, void *map2_body) {
-	float mag1 = map1_body ? ((hashmap_body_t *) map1_body)->mag : 0;
-	float mag2 = map2_body ? ((hashmap_body_t *) map2_body)->mag : 0;
+	float mag1 = map1_body ? ((document_vector_t *) map1_body)->mag : 0;
+	float mag2 = map2_body ? ((document_vector_t *) map2_body)->mag : 0;
 
 	float d = mag1 - mag2;
 
@@ -272,7 +272,7 @@ float meta_distance(void *map1_body, void *map2_body) {
 }
 
 void *member_extract(void *map_body, void *dimension) {
-	return get__hashmap(((hashmap_body_t *) map_body)->map, (char *) dimension, "");
+	return get__hashmap(((document_vector_t *) map_body)->map, (char *) dimension, "");
 }
 
 void *next_dimension(void *curr_dimension) {
