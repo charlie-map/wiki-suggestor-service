@@ -3,6 +3,7 @@
 #include <math.h>
 
 // add connections to t-algorithm:
+#include "t-algorithm/serialize/serialize.h"
 #include "t-algorithm/serialize/vecrep.h"
 #include "t-algorithm/serialize/token.h"
 #include "t-algorithm/nearest-neighbor/kd-tree.h"
@@ -21,10 +22,17 @@
 #define K 32
 #define CLUSTER_THRESHOLD 2
 
+#define RELOAD 0
+
 MYSQL *db;
 
+int ID_index, *ID_len;
+char **ID;
 hashmap *doc_map;
 cluster_t **cluster;
+
+hashmap *term_freq;
+FILE *title_writer;
 
 int weight(void *map1_val, void *map2_val);
 float distance(void *map1_val, void *map2_val);
@@ -49,7 +57,16 @@ void nearest_neighbor(req_t req, res_t res) {
 		return;
 	}
 
-	hashmap_body_t *curr_doc = get__hashmap(doc_map, (char *) get__hashmap(db_r->row__data[0], "id", ""), "");
+	char *curr_docID = (char *) get__hashmap(db_r->row__data[0], "id", "");
+	hashmap_body_t *curr_doc = get__hashmap(doc_map, curr_docID, "");
+
+	// document exists, but has not been serialized into the current document map
+	if (!curr_doc) {
+		db_res *db_wiki_page = db_query(db, "SELECT wiki_page FROM page WHERE id=?", curr_docID);
+
+		token_t *token_wiki_page = tokenize('s', (char *) get__hashmap(db_wiki_page->row__data[0], "wiki_page", ""), "");
+
+	}
 
 	cluster_t *closest_cluster = find_closest_cluster(cluster, K, curr_doc);
 
@@ -101,24 +118,44 @@ int main() {
 	app_post(app, "/nn", nearest_neighbor);
 
 	// reset files
-	http_pull_to_file();
+	if (RELOAD)
+		http_pull_to_file();
 
 	// create clusters
-	doc_map = deserialize_title("title.txt");
+	term_freq = make__hashmap(0, NULL, destroy_tf_t);
+	ID_len = malloc(sizeof(int)); *ID_len = 8; ID_index = 0;
+	ID = malloc(sizeof(char *) * *ID_len);
+	ID_index = deserialize_title("title.txt", doc_map, &ID, ID_len);
 	int *word_bag_len = malloc(sizeof(int));
-	char **word_bag = deserialize("docbags.txt", doc_map, word_bag_len);
+	char **word_bag = deserialize("docbags.txt", term_freq, doc_map, word_bag_len);
 
-	cluster = cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
-	cluster_to_file(cluster, K, "cluster.txt");
-	// cluster = deserialize_cluster("cluster.txt", K, doc_map, word_bag, word_bag_len);
+	if (RELOAD) {
+		cluster = cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
+		cluster_to_file(cluster, K, "cluster.txt");
+	} else {
+		cluster = deserialize_cluster("cluster.txt", K, doc_map, word_bag, word_bag_len);
+	}
 
 	// setup database:
 	// db = db_connect("SERVER", "USERNAME", "PASSWORD", "DATABASE-NAME");
 
 	int status = app_listen(HOST, PORT, app);
 
+	// reserialize documents
+	FILE *index_writer = fopen("docbags.txt", "w");
+
+	if (!index_writer) {
+		printf("\033[0;31m");
+		printf("\n** Error opening file **\n");
+		printf("\033[0;37m");
+	}
+
+	index_write(index_writer, word_bag, word_bag_len, term_freq, *ID_len);
+	fclose(index_writer);
+
 	destroy_cluster(cluster, K);
 	deepdestroy__hashmap(doc_map);
+	deepdestroy__hashmap(term_freq);
 
 	for (int free_words = 0; free_words < *word_bag_len; free_words++) {
 		free(word_bag[free_words]);

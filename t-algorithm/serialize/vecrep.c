@@ -5,11 +5,8 @@
 #include <math.h>
 
 #include "vecrep.h"
-#include "trie.h"
 #include "token.h"
-#include "../utils/request.h"
 #include "../utils/hashmap.h"
-#include "serialize.h"
 
 #define HOST getenv("WIKIREAD_HOST")
 #define PORT getenv("WIKIREAD_PORT")
@@ -43,7 +40,7 @@ trie_t *fill_stopwords(char *stop_word_file) {
 	return trie;
 }
 
-typedef struct SerializeObject {
+struct SerializeObject {
 	char **all_IDs;
 	char **array_body;
 	int *array_length;
@@ -58,7 +55,7 @@ typedef struct SerializeObject {
 
 	int start_read_body;
 	int end_read_body;
-} serialize_t;
+};
 
 serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_length,
 	socket_t **sock_data, pthread_mutex_t *sock_mutex, trie_t *stopword_trie,
@@ -84,8 +81,6 @@ serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_len
 
 	return new_ser;
 }
-
-void *data_read(void *meta_ptr);
 
 int http_pull_to_file() {
 	// create stopword structure
@@ -185,32 +180,7 @@ int http_pull_to_file() {
 	int *word_len = malloc(sizeof(int));
 	char **words = (char **) keys__hashmap(term_freq, word_len, "");
 
-	for (int fp_word = 0; fp_word < *word_len; fp_word++) {
-		tf_t *dat = get__hashmap(term_freq, words[fp_word], "");
-
-		// check that the term has a high enough document frequency
-		if (dat->doc_freq < DTF_THRESHOLD || (dat->doc_freq / *array_length) > DTF_PERCENT_THRESHOLD) {
-			// remove the key and value from the hashmap
-			delete__hashmap(term_freq, words[fp_word]);
-
-			continue;
-		}
-
-		int doc_freq_len = (int) log10(dat->doc_freq) + 2;
-		char *doc_freq_str = malloc(sizeof(char) * doc_freq_len);
-		sprintf(doc_freq_str, "%d", dat->doc_freq);
-
-		fputs(words[fp_word], index_writer);
-		fputc(' ', index_writer);
-		fputs(doc_freq_str, index_writer);
-
-		free(doc_freq_str);
-
-		fputc(':', index_writer);
-		fputs(dat->full_rep, index_writer);
-		fputc('\n', index_writer);
-	}
-	printf("%d\n", *word_len);
+	index_write(index_writer, words, word_len, term_freq, *array_length);
 
 	free(word_len);
 	free(words);
@@ -251,7 +221,7 @@ int http_pull_to_file() {
 		-- hashmap *term_freq (requires mutex locking)
 		-- FILE *title_writer (requires mutex locking)
 
-		-- int *doc_bag_length
+		-- char *start_wiki || if this is true, then no reading from the server should occur
 
 		-- int start_read_body
 		-- int end_read_body
@@ -309,4 +279,35 @@ void *data_read(void *meta_ptr) {
 	}
 
 	return NULL;
+}
+
+int index_write(FILE *index_writer, char **words, int *word_len, hashmap *term_freq, int total_docs) {
+	for (int fp_word = 0; fp_word < *word_len; fp_word++) {
+		tf_t *dat = get__hashmap(term_freq, words[fp_word], "");
+
+		// check that the term has a high enough document frequency
+		if (dat->doc_freq < DTF_THRESHOLD || (dat->doc_freq / total_docs) > DTF_PERCENT_THRESHOLD) {
+			// remove the key and value from the hashmap
+			delete__hashmap(term_freq, words[fp_word]);
+
+			continue;
+		}
+
+		int doc_freq_len = (int) log10(dat->doc_freq) + 2;
+		char *doc_freq_str = malloc(sizeof(char) * doc_freq_len);
+		sprintf(doc_freq_str, "%d", dat->doc_freq);
+
+		fputs(words[fp_word], index_writer);
+		fputc(' ', index_writer);
+		fputs(doc_freq_str, index_writer);
+
+		free(doc_freq_str);
+
+		fputc(':', index_writer);
+		fputs(dat->full_rep, index_writer);
+		fputc('\n', index_writer);
+	}
+	printf("%d\n", *word_len);
+
+	return 0;
 }

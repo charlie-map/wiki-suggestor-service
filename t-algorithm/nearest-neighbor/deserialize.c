@@ -5,6 +5,7 @@
 
 #include "deserialize.h"
 #include "../utils/helper.h"
+#include "../serialize/serialize.h"
 
 void destroy_hashmap_float(void *v) {
 	free((float *) v);
@@ -15,7 +16,6 @@ void destroy_hashmap_float(void *v) {
 hashmap_body_t *create_hashmap_body(char *id, char *title, float mag) {
 	hashmap_body_t *hm = (hashmap_body_t *) malloc(sizeof(hashmap_body_t));
 
-	hm->id = id;
 	hm->title = title;
 
 	hm->mag = mag;
@@ -27,7 +27,6 @@ hashmap_body_t *create_hashmap_body(char *id, char *title, float mag) {
 }
 
 void destroy_hashmap_body(hashmap_body_t *body_hash) {
-	free(body_hash->id);
 	free(body_hash->title);
 
 	deepdestroy__hashmap(body_hash->map);
@@ -40,7 +39,8 @@ void hm_destroy_hashmap_body(void *hm_body) {
 	return destroy_hashmap_body((hashmap_body_t *) hm_body);
 }
 
-hashmap *deserialize_title(char *title_reader) {
+int deserialize_title(char *title_reader, hashmap *doc_map, char ***ID, int *ID_len) {
+	int ID_index = 0;
 	FILE *index = fopen(title_reader, "r");
 
 	if (!index) {
@@ -49,7 +49,7 @@ hashmap *deserialize_title(char *title_reader) {
 		printf("\033[0;37m");
 	}
 
-	hashmap *documents = make__hashmap(0, NULL, hm_destroy_hashmap_body);
+	doc_map = make__hashmap(0, NULL, hm_destroy_hashmap_body);
 	// create hashmap store
 	size_t line_buffer_size = sizeof(char) * 8;
 	char *line_buffer = malloc(line_buffer_size);
@@ -62,7 +62,7 @@ hashmap *deserialize_title(char *title_reader) {
 
 		int title_length = line_buffer_length - (strlen(split_row[0]) + strlen(split_row[*row_num - 1]) + 2);
 		// now pull out the different components into a hashmap value:
-		char *doc_ID = split_row[0];
+		(*ID)[ID_index] = split_row[0];
 
 		float mag = atof(split_row[*row_num - 1]);
 		free(split_row[*row_num - 1]);
@@ -81,7 +81,10 @@ hashmap *deserialize_title(char *title_reader) {
 
 		free(split_row);
 
-		insert__hashmap(documents, doc_ID, create_hashmap_body(doc_ID, doc_title, mag), "", compareCharKey, NULL);
+		insert__hashmap(doc_map, (*ID)[ID_index], create_hashmap_body((*ID)[ID_index], doc_title, mag), "", compareCharKey, NULL);
+
+		ID_index++;
+		*ID = resize_array(*ID, ID_len, ID_index, sizeof(char *));
 	}
 
 	free(row_num);
@@ -89,7 +92,7 @@ hashmap *deserialize_title(char *title_reader) {
 
 	fclose(index);
 
-	return documents;
+	return ID_index;
 }
 
 int destroy_split_string(char **split_string, int *split_string_len) {
@@ -102,7 +105,16 @@ int destroy_split_string(char **split_string, int *split_string_len) {
 	return 0;
 }
 
-char **deserialize(char *index_reader, hashmap *docs, int *max_words) {
+int first_occurence(char *str, char delim) {
+	for (int find_delim = 0; str[find_delim]; find_delim++) {
+		if (str[find_delim] == delim)
+			return find_delim;
+	}
+
+	return -1;
+}
+
+char **deserialize(char *index_reader, hashmap *term_freq, hashmap *docs, int *max_words) {
 	int words_index = 0; *max_words = 132;
 	char **words = malloc(sizeof(char *) * *max_words);
 
@@ -124,11 +136,24 @@ char **deserialize(char *index_reader, hashmap *docs, int *max_words) {
 		char **line_subs = split_string(line_buffer, 0, line_sub_max, "-d-r", delimeter_check, " :,|", num_is_range);
 
 		words[words_index] = line_subs[0];
+		tf_t *tf = new_tf_t(NULL);
+		int colon_delim = first_occurence(line_buffer, ':');
+
+		int full_rep_curr_len = strlen(line_buffer + sizeof(char) * (colon_delim + 1));
+		tf->max_full_rep = full_rep_curr_len * 2;
+		tf->full_rep_index = full_rep_curr_len;
+		tf->full_rep = realloc(tf->full_rep, sizeof(char) * tf->max_full_rep);
+
+		strcpy(tf->full_rep, line_buffer + sizeof(char) * (colon_delim + 1));
 
 		// ladder 9:124,1|93,1|245,2|190,1|193,2|19,1|104,1|55,3|57,2|
 		// go through each document and compute normalized (using document frequency) term frequencies
 		float doc_freq = atof(line_subs[1]);
 		free(line_subs[1]);
+
+		tf->doc_freq = doc_freq;
+
+		insert__hashmap(term_freq, words[words_index], "", compareCharKey, NULL);
 
 		for (int read_doc_freq = 2; read_doc_freq < *line_sub_max; read_doc_freq += 2) {
 			hashmap_body_t *doc = get__hashmap(docs, line_subs[read_doc_freq], "");

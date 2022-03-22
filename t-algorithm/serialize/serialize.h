@@ -21,6 +21,7 @@ typedef struct TermFreqRep {
 
 	int doc_freq;
 } tf_t;
+tf_t *new_tf_t(char *ID);
 void destroy_tf_t(void *tf);
 
 int delimeter_check(char curr_char, char *delims);
