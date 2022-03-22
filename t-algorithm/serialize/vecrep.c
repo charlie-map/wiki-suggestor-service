@@ -40,7 +40,7 @@ trie_t *fill_stopwords(char *stop_word_file) {
 	return trie;
 }
 
-struct SerializeObject {
+typedef struct SerializeObject {
 	char **all_IDs;
 	char **array_body;
 	int *array_length;
@@ -55,7 +55,7 @@ struct SerializeObject {
 
 	int start_read_body;
 	int end_read_body;
-};
+} serialize_t;
 
 serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_length,
 	socket_t **sock_data, pthread_mutex_t *sock_mutex, trie_t *stopword_trie,
@@ -82,10 +82,7 @@ serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_len
 	return new_ser;
 }
 
-int http_pull_to_file() {
-	// create stopword structure
-	trie_t *stopword_trie = fill_stopwords("t-algorithm/serialize/stopwords.txt");
-
+int http_pull_to_file(trie_t *stopword_trie) {
 	// create write stream:
 	FILE *index_writer = fopen("docbags.txt", "w");
 	FILE *title_writer = fopen("title.txt", "w");

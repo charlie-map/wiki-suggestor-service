@@ -5,13 +5,9 @@
 #include "trie.h"
 #include "serialize.h"
 
-typedef struct SerializeObject serialize_t;
-serialize_t *create_serializer(char **all_IDs, char **array_body, int *array_length,
-	socket_t **sock_data, pthread_mutex_t *sock_mutex, trie_t *stopword_trie,
-	mutex_t *term_freq, mutex_t *title_writer,
-	int start_read_body, int end_read_body);
+trie_t *fill_stopwords(char *stop_word_file);
 
-int http_pull_to_file();
+int http_pull_to_file(trie_t *stopwords);
 
 void *data_read(void *meta_ptr);
 int index_write(FILE *index_writer, char **words, int *word_len, hashmap *term_freq, int doc_number);

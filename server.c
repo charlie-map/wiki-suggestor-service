@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include <math.h>
 
 // add connections to t-algorithm:
@@ -10,6 +11,7 @@
 #include "t-algorithm/nearest-neighbor/k-means.h"
 #include "t-algorithm/nearest-neighbor/deserialize.h"
 #include "t-algorithm/utils/hashmap.h"
+#include "t-algorithm/utils/helper.h"
 
 // database
 #include "databaseC/db.h"
@@ -26,13 +28,15 @@
 
 MYSQL *db;
 
+trie_t *stopword_trie;
+
 int ID_index, *ID_len;
-char **ID;
+char **ID; pthread_mutex_t ID_mutex;
 hashmap *doc_map;
 cluster_t **cluster;
 
-hashmap *term_freq;
-FILE *title_writer;
+mutex_t *term_freq;
+mutex_t *title_fp;
 
 int weight(void *map1_val, void *map2_val);
 float distance(void *map1_val, void *map2_val);
@@ -66,6 +70,15 @@ void nearest_neighbor(req_t req, res_t res) {
 
 		token_t *token_wiki_page = tokenize('s', (char *) get__hashmap(db_wiki_page->row__data[0], "wiki_page", ""), "");
 
+		pthread_mutex_lock(&(term_freq->mutex));
+		pthread_mutex_lock(&ID_mutex);
+		word_bag((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]));
+		pthread_mutex_unlock(&(term_freq->mutex));
+
+		ID_index++;
+		ID = resize_array(ID, ID_len, ID_index, sizeof(char *));
+
+		pthread_mutex_unlock(&ID_mutex);		
 	}
 
 	cluster_t *closest_cluster = find_closest_cluster(cluster, K, curr_doc);
@@ -117,17 +130,29 @@ int main() {
 
 	app_post(app, "/nn", nearest_neighbor);
 
+	stopword_trie = fill_stopwords("t-algorithm/serialize/stopwords.txt");
+
 	// reset files
 	if (RELOAD)
-		http_pull_to_file();
+		http_pull_to_file(stopword_trie);
+	
+	hashmap *term_freq_map = make__hashmap(0, NULL, destroy_tf_t);
 
-	// create clusters
-	term_freq = make__hashmap(0, NULL, destroy_tf_t);
 	ID_len = malloc(sizeof(int)); *ID_len = 8; ID_index = 0;
 	ID = malloc(sizeof(char *) * *ID_len);
+	pthread_mutex_init(&ID_mutex, NULL);
 	ID_index = deserialize_title("title.txt", doc_map, &ID, ID_len);
 	int *word_bag_len = malloc(sizeof(int));
-	char **word_bag = deserialize("docbags.txt", term_freq, doc_map, word_bag_len);
+	char **word_bag = deserialize("docbags.txt", term_freq_map, doc_map, word_bag_len);
+
+	FILE *title_writer = fopen("title.txt", "w");
+	if (!title_writer) {
+		printf("\033[0;31m");
+		printf("\n** Error opening file **\n");
+		printf("\033[0;37m");
+	}
+	title_fp = malloc(sizeof(mutex_t)); *title_fp = newMutexLocker(title_writer);
+	term_freq = malloc(sizeof(mutex_t)); *term_freq = newMutexLocker(term_freq_map);
 
 	if (RELOAD) {
 		cluster = cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
@@ -150,12 +175,12 @@ int main() {
 		printf("\033[0;37m");
 	}
 
-	index_write(index_writer, word_bag, word_bag_len, term_freq, *ID_len);
+	index_write(index_writer, word_bag, word_bag_len, (hashmap *) term_freq->runner, *ID_len);
 	fclose(index_writer);
 
 	destroy_cluster(cluster, K);
 	deepdestroy__hashmap(doc_map);
-	deepdestroy__hashmap(term_freq);
+	deepdestroy__hashmap((hashmap *) term_freq->runner);
 
 	for (int free_words = 0; free_words < *word_bag_len; free_words++) {
 		free(word_bag[free_words]);
