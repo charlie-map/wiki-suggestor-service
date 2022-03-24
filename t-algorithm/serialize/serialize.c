@@ -197,7 +197,6 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 		m_val->full_rep[m_val->full_rep_index] = '\0';
 	}
 
-	printf("title size %d\n", sum_of_squares);
 	fprintf(title_fp->runner, " %d\n", sum_of_squares);
 	pthread_mutex_unlock(&(title_fp->mutex));
 
