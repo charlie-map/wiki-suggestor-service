@@ -1,14 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
 #include <math.h>
 
 // add connections to t-algorithm:
+#include "t-algorithm/serialize/serialize.h"
 #include "t-algorithm/serialize/vecrep.h"
 #include "t-algorithm/serialize/token.h"
 #include "t-algorithm/nearest-neighbor/kd-tree.h"
 #include "t-algorithm/nearest-neighbor/k-means.h"
 #include "t-algorithm/nearest-neighbor/deserialize.h"
+#include "t-algorithm/nearest-neighbor/document-vector.h"
 #include "t-algorithm/utils/hashmap.h"
+#include "t-algorithm/utils/helper.h"
 
 // database
 #include "databaseC/db.h"
@@ -21,10 +26,19 @@
 #define K 32
 #define CLUSTER_THRESHOLD 2
 
+#define RELOAD 0
+
 MYSQL *db;
 
+trie_t *stopword_trie;
+
+int ID_index, *ID_len;
+char **ID; pthread_mutex_t ID_mutex;
 hashmap *doc_map;
 cluster_t **cluster;
+
+mutex_t *term_freq;
+mutex_t *title_fp;
 
 int weight(void *map1_val, void *map2_val);
 float distance(void *map1_val, void *map2_val);
@@ -49,7 +63,36 @@ void nearest_neighbor(req_t req, res_t res) {
 		return;
 	}
 
-	hashmap_body_t *curr_doc = get__hashmap(doc_map, (char *) get__hashmap(db_r->row__data[0], "id", ""), "");
+	char *curr_docID = (char *) get__hashmap(db_r->row__data[0], "id", "");
+	document_vector_t *curr_doc = get__hashmap(doc_map, curr_docID, "");
+
+	// document exists, but has not been serialized into the current document map
+	if (!curr_doc) {
+		db_res *db_wiki_page = db_query(db, "SELECT page_name, wiki_page FROM page WHERE id=?", curr_docID);
+		char *page_title = (char *) get__hashmap(db_wiki_page->row__data[0], "page_name", "");
+		char *page_text = (char *) get__hashmap(db_wiki_page->row__data[0], "wiki_page", "");
+
+		int full_page_len = strlen(curr_docID) + strlen(page_title) + strlen(page_text) + 59;
+		char *full_page = malloc(sizeof(char) * full_page_len);
+
+		sprintf(full_page, "<page>\n<id>%s</id>\n<title>%s</title>\n<text>%s</text>\n</page>", curr_docID, page_title, page_text);
+
+		token_t *token_wiki_page = tokenize('s',full_page, "");
+
+		curr_doc = create_document_vector(curr_docID, page_title, 0);
+
+		pthread_mutex_lock(&(term_freq->mutex));
+		pthread_mutex_lock(&ID_mutex);
+		word_bag((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), curr_doc);
+		pthread_mutex_unlock(&(term_freq->mutex));
+
+		ID_index++;
+		ID = resize_array(ID, ID_len, ID_index, sizeof(char *));
+
+		pthread_mutex_unlock(&ID_mutex);
+
+		// curr doc now holds all the data which the next steps need
+	}
 
 	cluster_t *closest_cluster = find_closest_cluster(cluster, K, curr_doc);
 
@@ -57,9 +100,9 @@ void nearest_neighbor(req_t req, res_t res) {
 	char *d_1 = dimension_charset[0];
 
 	// build array of documents within the closest cluster:
-	hashmap_body_t **cluster_docs = malloc(sizeof(hashmap_body_t *) * closest_cluster->doc_pos_index);
+	document_vector_t **cluster_docs = malloc(sizeof(document_vector_t *) * closest_cluster->doc_pos_index);
 	for (int pull_cluster_doc = 0; pull_cluster_doc < closest_cluster->doc_pos_index; pull_cluster_doc++) {
-		cluster_docs[pull_cluster_doc] = (hashmap_body_t *) get__hashmap(doc_map, closest_cluster->doc_pos[pull_cluster_doc], "");
+		cluster_docs[pull_cluster_doc] = (document_vector_t *) get__hashmap(doc_map, closest_cluster->doc_pos[pull_cluster_doc], "");
 	}
 
 	kdtree_t *cluster_rep = kdtree_create(weight, member_extract, d_1, next_dimension, distance, meta_distance);
@@ -68,7 +111,7 @@ void nearest_neighbor(req_t req, res_t res) {
 	kdtree_load(cluster_rep, (void ***) cluster_docs, closest_cluster->doc_pos_index);
 
 	// search for most relavant document:
-	hashmap_body_t *return_doc = kdtree_search(cluster_rep, d_1, curr_doc);
+	document_vector_t *return_doc = kdtree_search(cluster_rep, d_1, curr_doc);
 
 	db_res_destroy(db_r);
 	db_r = db_query(db, "SELECT page_name FROM page WHERE id=?", return_doc->id);
@@ -100,25 +143,59 @@ int main() {
 
 	app_post(app, "/nn", nearest_neighbor);
 
+	stopword_trie = fill_stopwords("t-algorithm/serialize/stopwords.txt");
+
 	// reset files
-	http_pull_to_file();
+	if (RELOAD)
+		http_pull_to_file(stopword_trie);
 
-	// create clusters
-	doc_map = deserialize_title("title.txt");
+	hashmap *term_freq_map = make__hashmap(0, NULL, destroy_tf_t);
+	doc_map = make__hashmap(0, NULL, hm_destroy_hashmap_body);
+
+	ID_len = malloc(sizeof(int)); *ID_len = 8; ID_index = 0;
+	ID = malloc(sizeof(char *) * *ID_len);
+	pthread_mutex_init(&ID_mutex, NULL);
+	ID_index = deserialize_title("title.txt", doc_map, &ID, ID_len);
 	int *word_bag_len = malloc(sizeof(int));
-	char **word_bag = deserialize("docbags.txt", doc_map, word_bag_len);
+	char **word_bag = deserialize("docbags.txt", term_freq_map, doc_map, word_bag_len);
 
-	cluster = cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
-	cluster_to_file(cluster, K, "cluster.txt");
-	// cluster = deserialize_cluster("cluster.txt", K, doc_map, word_bag, word_bag_len);
+	FILE *title_writer = fopen("title.txt", "a");
+	fseek(title_writer, 0, SEEK_END);
+	if (!title_writer) {
+		printf("\033[0;31m");
+		printf("\n** Error opening file **\n");
+		printf("\033[0;37m");
+	}
+	title_fp = malloc(sizeof(mutex_t)); *title_fp = newMutexLocker(title_writer);
+	term_freq = malloc(sizeof(mutex_t)); *term_freq = newMutexLocker(term_freq_map);
+
+	if (RELOAD) {
+		cluster = cluster = k_means(doc_map, K, CLUSTER_THRESHOLD);
+		cluster_to_file(cluster, K, "cluster.txt");
+	} else {
+		cluster = deserialize_cluster("cluster.txt", K, doc_map, word_bag, word_bag_len);
+	}
 
 	// setup database:
-	// db = db_connect("SERVER", "USERNAME", "PASSWORD", "DATABASE-NAME");
+	// db = db_connect("HOST", "USER", "PASSWORD", "DATABASE");
 
 	int status = app_listen(HOST, PORT, app);
 
+	// reserialize documents
+	FILE *index_writer = fopen("docbags.txt", "w");
+
+	if (!index_writer) {
+		printf("\033[0;31m");
+		printf("\n** Error opening file **\n");
+		printf("\033[0;37m");
+	}
+
+	index_write(index_writer, word_bag, word_bag_len, (hashmap *) term_freq->runner, *ID_len);
+	fclose(index_writer);
+
 	destroy_cluster(cluster, K);
 	deepdestroy__hashmap(doc_map);
+	deepdestroy__hashmap((hashmap *) term_freq->runner);
 
 	for (int free_words = 0; free_words < *word_bag_len; free_words++) {
 		free(word_bag[free_words]);
@@ -195,8 +272,8 @@ float distance(void *map1_val, void *map2_val) {
 }
 
 float meta_distance(void *map1_body, void *map2_body) {
-	float mag1 = map1_body ? ((hashmap_body_t *) map1_body)->mag : 0;
-	float mag2 = map2_body ? ((hashmap_body_t *) map2_body)->mag : 0;
+	float mag1 = map1_body ? ((document_vector_t *) map1_body)->mag : 0;
+	float mag2 = map2_body ? ((document_vector_t *) map2_body)->mag : 0;
 
 	float d = mag1 - mag2;
 
@@ -204,7 +281,7 @@ float meta_distance(void *map1_body, void *map2_body) {
 }
 
 void *member_extract(void *map_body, void *dimension) {
-	return get__hashmap(((hashmap_body_t *) map_body)->map, (char *) dimension, "");
+	return get__hashmap(((document_vector_t *) map_body)->map, (char *) dimension, "");
 }
 
 void *next_dimension(void *curr_dimension) {
