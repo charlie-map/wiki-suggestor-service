@@ -9,7 +9,7 @@ typedef struct DocumentVector {
 	hashmap *map;
 } document_vector_t;
 
-document_vector_t *create_hashmap_body(char *id, char *title, float mag);
+document_vector_t *create_document_vector(char *id, char *title, float mag);
 
 void destroy_hashmap_float(void *v);
 void destroy_hashmap_body(document_vector_t *body_hash);

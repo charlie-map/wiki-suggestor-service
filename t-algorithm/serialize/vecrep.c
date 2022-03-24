@@ -290,21 +290,8 @@ int index_write(FILE *index_writer, char **words, int *word_len, hashmap *term_f
 			continue;
 		}
 
-		int doc_freq_len = (int) log10(dat->doc_freq) + 2;
-		char *doc_freq_str = malloc(sizeof(char) * doc_freq_len);
-		sprintf(doc_freq_str, "%d", dat->doc_freq);
-
-		fputs(words[fp_word], index_writer);
-		fputc(' ', index_writer);
-		fputs(doc_freq_str, index_writer);
-
-		free(doc_freq_str);
-
-		fputc(':', index_writer);
-		fputs(dat->full_rep, index_writer);
-		fputc('\n', index_writer);
+		fprintf(index_writer, "%s %d:%s\n", words[fp_word], dat->doc_freq, dat->full_rep);
 	}
-	printf("%d\n", *word_len);
 
 	return 0;
 }

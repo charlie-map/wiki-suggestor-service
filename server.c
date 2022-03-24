@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 #include <math.h>
 
@@ -67,11 +68,18 @@ void nearest_neighbor(req_t req, res_t res) {
 
 	// document exists, but has not been serialized into the current document map
 	if (!curr_doc) {
-		db_res *db_wiki_page = db_query(db, "SELECT wiki_page FROM page WHERE id=?", curr_docID);
+		db_res *db_wiki_page = db_query(db, "SELECT page_name, wiki_page FROM page WHERE id=?", curr_docID);
+		char *page_title = (char *) get__hashmap(db_wiki_page->row__data[0], "page_name", "");
+		char *page_text = (char *) get__hashmap(db_wiki_page->row__data[0], "wiki_page", "");
 
-		token_t *token_wiki_page = tokenize('s', (char *) get__hashmap(db_wiki_page->row__data[0], "wiki_page", ""), "");
+		int full_page_len = strlen(curr_docID) + strlen(page_title) + strlen(page_text) + 59;
+		char *full_page = malloc(sizeof(char) * full_page_len);
 
-		curr_doc = create_hashmap_body(NULL, NULL, 0);
+		sprintf(full_page, "<page>\n<id>%s</id>\n<title>%s</title>\n<text>%s</text>\n</page>", curr_docID, page_title, page_text);
+
+		token_t *token_wiki_page = tokenize('s',full_page, "");
+
+		curr_doc = create_document_vector(curr_docID, page_title, 0);
 
 		pthread_mutex_lock(&(term_freq->mutex));
 		pthread_mutex_lock(&ID_mutex);
@@ -140,8 +148,9 @@ int main() {
 	// reset files
 	if (RELOAD)
 		http_pull_to_file(stopword_trie);
-	
+
 	hashmap *term_freq_map = make__hashmap(0, NULL, destroy_tf_t);
+	doc_map = make__hashmap(0, NULL, hm_destroy_hashmap_body);
 
 	ID_len = malloc(sizeof(int)); *ID_len = 8; ID_index = 0;
 	ID = malloc(sizeof(char *) * *ID_len);
@@ -150,7 +159,7 @@ int main() {
 	int *word_bag_len = malloc(sizeof(int));
 	char **word_bag = deserialize("docbags.txt", term_freq_map, doc_map, word_bag_len);
 
-	FILE *title_writer = fopen("title.txt", "w");
+	FILE *title_writer = fopen("title.txt", "a");
 	fseek(title_writer, 0, SEEK_END);
 	if (!title_writer) {
 		printf("\033[0;31m");
@@ -168,7 +177,7 @@ int main() {
 	}
 
 	// setup database:
-	// db = db_connect("SERVER", "USERNAME", "PASSWORD", "DATABASE-NAME");
+	// db = db_connect("HOST", "USER", "PASSWORD", "DATABASE");
 
 	int status = app_listen(HOST, PORT, app);
 

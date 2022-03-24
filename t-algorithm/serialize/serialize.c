@@ -135,8 +135,6 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 		if (prev_hash_key) {
 			tf_t *hashmap_freq = (tf_t *) get__hashmap(term_freq, full_page_data[add_hash], "");
 
-			free(full_page_data[add_hash]);
-
 			if (strcmp(*ID, hashmap_freq->curr_doc_id) == 0) {
 				hashmap_freq->curr_term_freq++;
 
@@ -198,15 +196,10 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 		m_val->full_rep_index += length;
 		m_val->full_rep[m_val->full_rep_index] = '\0';
 	}
-	char *sum_square_char = malloc(sizeof(char) * 13);
-	memset(sum_square_char, '\0', sizeof(char) * 13);
 
-	sprintf(sum_square_char, " %d\n", sum_of_squares);
-	total_bag_size += strlen(sum_square_char);
-	fputs(sum_square_char, title_fp->runner);
+	printf("title size %d\n", sum_of_squares);
+	fprintf(title_fp->runner, " %d\n", sum_of_squares);
 	pthread_mutex_unlock(&(title_fp->mutex));
-
-	free(sum_square_char);
 
 	free(keys);
 	free(key_len);

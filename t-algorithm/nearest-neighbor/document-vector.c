@@ -10,9 +10,10 @@ void destroy_hashmap_float(void *v) {
 	return;
 }
 
-document_vector_t *create_hashmap_body(char *id, char *title, float mag) {
+document_vector_t *create_document_vector(char *id, char *title, float mag) {
 	document_vector_t *hm = (document_vector_t *) malloc(sizeof(document_vector_t));
 
+	hm->id = id;
 	hm->title = title;
 
 	hm->mag = mag;
@@ -31,5 +32,3 @@ void destroy_hashmap_body(document_vector_t *body_hash) {
 	free(body_hash);
 	return;
 }
-
-#include "document-vector.h"

@@ -22,8 +22,6 @@ int deserialize_title(char *title_reader, hashmap *doc_map, char ***ID, int *ID_
 		printf("\033[0;37m");
 	}
 
-	doc_map = make__hashmap(0, NULL, hm_destroy_hashmap_body);
-	// create hashmap store
 	size_t line_buffer_size = sizeof(char) * 8;
 	char *line_buffer = malloc(line_buffer_size);
 
@@ -54,7 +52,8 @@ int deserialize_title(char *title_reader, hashmap *doc_map, char ***ID, int *ID_
 
 		free(split_row);
 
-		insert__hashmap(doc_map, (*ID)[ID_index], create_hashmap_body((*ID)[ID_index], doc_title, mag), "", compareCharKey, NULL);
+		document_vector_t* new_doc_vector = create_document_vector((*ID)[ID_index], doc_title, mag);
+		insert__hashmap(doc_map, (*ID)[ID_index], new_doc_vector, "", compareCharKey, NULL);
 
 		ID_index++;
 		*ID = resize_array(*ID, ID_len, ID_index, sizeof(char *));
@@ -108,8 +107,14 @@ char **deserialize(char *index_reader, hashmap *term_freq, hashmap *docs, int *m
 		int *line_sub_max = malloc(sizeof(int));
 		char **line_subs = split_string(line_buffer, 0, line_sub_max, "-d-r", delimeter_check, " :,|", num_is_range);
 
+		if (*line_sub_max < 2) {
+			free(line_subs[0]);
+
+			continue;
+		}
+
 		words[words_index] = line_subs[0];
-		tf_t *tf = new_tf_t(NULL);
+		tf_t *tf = new_tf_t((char *) getKey__hashmap(docs, line_subs[2]));
 		int colon_delim = first_occurence(line_buffer, ':');
 
 		int full_rep_curr_len = strlen(line_buffer + sizeof(char) * (colon_delim + 1));
@@ -119,6 +124,9 @@ char **deserialize(char *index_reader, hashmap *term_freq, hashmap *docs, int *m
 
 		strcpy(tf->full_rep, line_buffer + sizeof(char) * (colon_delim + 1));
 
+		tf->full_rep[tf->full_rep_index - 1] = '\0';
+		tf->full_rep_index--;
+
 		// ladder 9:124,1|93,1|245,2|190,1|193,2|19,1|104,1|55,3|57,2|
 		// go through each document and compute normalized (using document frequency) term frequencies
 		float doc_freq = atof(line_subs[1]);
@@ -126,9 +134,10 @@ char **deserialize(char *index_reader, hashmap *term_freq, hashmap *docs, int *m
 
 		tf->doc_freq = doc_freq;
 
-		insert__hashmap(term_freq, words[words_index], "", compareCharKey, NULL);
+		insert__hashmap(term_freq, words[words_index], tf, "", compareCharKey, NULL);
 
-		for (int read_doc_freq = 2; read_doc_freq < *line_sub_max; read_doc_freq += 2) {
+		int read_doc_freq;
+		for (read_doc_freq = 2; read_doc_freq < *line_sub_max; read_doc_freq += 2) {
 			document_vector_t *doc = get__hashmap(docs, line_subs[read_doc_freq], "");
 			free(line_subs[read_doc_freq]);
 
