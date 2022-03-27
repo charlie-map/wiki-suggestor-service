@@ -229,8 +229,53 @@ void nearest_neighbor(req_t req, res_t res) {
 	return;
 }
 
+// expects user unique ID (uuid form) which connects to then selecting all documents
+// they have viewed thus far
 void unique_recommend(req_t req, res_t res) {
+	// calculate user id via their uuid
+	char *user_uuid = req_body(req, "uuid");
 
+	if (!user_uuid) {
+		res_end(res, "Missing UUID");
+		return;
+	}
+
+	db_res *db_r = db_query(db, "SELECT id, age FROM user WHERE unique_id=?", user_uuid);
+
+	if (!db_r->row_count) {
+		db_res_destroy(db_r);
+
+		res_end(res, "No user found");
+		return;
+	}
+
+	// grab user ID
+	char *user_ID = (char *) get__hashmap(db_r->row__data[0], "id", "");
+
+	db_res_destroy(db_r);
+
+	// get page_id, vote, page_vote_time, and focus_time from view_vote table
+	db_r = db_query(db, "SELECT page_id, vote, page_vote_time, focus_time FROM view_vote WHERE user_id=?", user_ID);
+
+	if (!db_r->row_count) {
+		db_res_destroy(db_r);
+
+		res_end(res, "000"); // some internal code I just made up and will soon forget
+		return;
+	}
+
+	hashmap *sub_user_doc = make__hashmap(0, NULL, NULL);
+	for (int copy_document_vector = 0; copy_document_vector < db_r->row_count; copy_document_vector++) {
+		char *page_id = (char *) get__hashmap(db_r->row__data[copy_document_vector], "page_id", "");
+		insert__hashmap(sub_user_doc, page_id, get__hashmap(doc_map, page_id, ""), "", NULL, NULL);
+	}
+
+	// otherwise we can move forward to computing a centroid
+	cluster_t **user_cluster_wrapped = k_means(sub_user_doc, 1, CLUSTER_THRESHOLD);
+	cluster_t *user_cluster = *user_cluster_wrapped;
+	free(user_cluster_wrapped);
+
+	
 }
 
 // build_dimensions functionalities based on vector_type:
