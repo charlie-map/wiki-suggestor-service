@@ -37,7 +37,7 @@ char **ID; pthread_mutex_t ID_mutex;
 hashmap *doc_map;
 cluster_t **cluster;
 
-char **doc_vector_kdtree_dimensions;
+char **doc_vector_kdtree_dimensions, *doc_vector_kdtree_start_dimension;
 mutex_t *mutex_doc_vector_kdtree;
 
 int *word_bag_len;
@@ -79,6 +79,7 @@ int main() {
 	char **word_bag = deserialize("docbags.txt", term_freq_map, doc_map, word_bag_len);
 
 	doc_vector_kdtree_dimensions = build_dimensions(term_freq_map, 'd');
+	doc_vector_kdtree_start_dimension = doc_vector_kdtree_dimensions[0];
 	kdtree_t *doc_vector_kdtree = kdtree_create(weight, member_extract, doc_vector_kdtree_dimensions, next_dimension, distance, meta_distance);
 	mutex_doc_vector_kdtree = malloc(sizeof(mutex_t));
 	*mutex_doc_vector_kdtree = newMutexLocker(doc_vector_kdtree);
@@ -275,7 +276,10 @@ void unique_recommend(req_t req, res_t res) {
 	cluster_t *user_cluster = *user_cluster_wrapped;
 	free(user_cluster_wrapped);
 
-	
+	// finding more than one?
+	hashmap *closest_doc_vector = kdtree_search(doc_vector_kdtree, doc_vector_kdtree_start_dimension, user_cluster->centroid, 3);
+
+
 }
 
 // build_dimensions functionalities based on vector_type:
@@ -352,29 +356,29 @@ char **build_dimensions(void *curr_vector_group, char vector_type) {
 
 int weight(void *map1_val, void *map2_val) {
 	if ((!map1_val && !map2_val) || (!map1_val && map2_val))
-		return 1;
-	else if (map1_val && !map2_val)
 		return 0;
+	else if (map1_val && !map2_val)
+		return 1;
 	else
 		return *(float *) map1_val < *(float *) map2_val;
 }
 
-float distance(void *map1_val, void *map2_val) {
-	float val1 = map1_val ? *(float *) map1_val : 0;
-	float val2 = map2_val ? *(float *) map2_val : 0;
+float distance(void *doc1_termfreq, void *doc2_termfreq) {
+	float doc1_freq = *(float *) doc1_termfreq;
+	float doc2_freq = *(float *) doc2_termfreq;
 
-	float d = val1 - val2;
+	float cosine_sim = (doc1_freq + doc2_freq) / ((doc1_freq * doc1_freq) + (doc2_freq * doc2_freq));
 
-	return d * d;
+	return cosine_sim;
 }
 
 float meta_distance(void *map1_body, void *map2_body) {
-	float mag1 = map1_body ? ((document_vector_t *) map1_body)->mag : 0;
-	float mag2 = map2_body ? ((document_vector_t *) map2_body)->mag : 0;
+	document_vector_t *doc1 = (document_vector_t *) map1_body;
+	document_vector_t *doc2 = (document_vector_t *) map2_body;
 
-	float d = mag1 - mag2;
+	float cosine_sim = cosine_similarity(doc1->map, doc1->sqrt_mag, doc2->map, doc2->sqrt_mag);
 
-	return d * d;
+	return cosine_sim;
 }
 
 void *member_extract(void *map_body, void *dimension) {
