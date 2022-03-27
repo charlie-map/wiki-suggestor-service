@@ -145,11 +145,16 @@ char **deserialize(char *index_reader, hashmap *term_freq, hashmap *docs, int *m
 			float term_frequency = atof(line_subs[read_doc_freq + 1]);
 			free(line_subs[read_doc_freq + 1]);
 
+			tf->tfs += term_frequency;
+			tf->tfs_sq += term_frequency * term_frequency;
+
 			float *normal_term_freq = malloc(sizeof(float));
 			*normal_term_freq = term_frequency / doc_freq;
 
 			insert__hashmap(doc->map, words[words_index], normal_term_freq, "", compareCharKey, NULL);
 		}
+
+		tf->standard_deviation = sqrt(tf->tfs_sq);
 
 		words_index++;
 		words = resize_array(words, max_words, words_index, sizeof(char *));

@@ -83,7 +83,7 @@ void nearest_neighbor(req_t req, res_t res) {
 
 		pthread_mutex_lock(&(term_freq->mutex));
 		pthread_mutex_lock(&ID_mutex);
-		word_bag((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), curr_doc);
+		token_to_terms((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), curr_doc);
 		pthread_mutex_unlock(&(term_freq->mutex));
 
 		ID_index++;
