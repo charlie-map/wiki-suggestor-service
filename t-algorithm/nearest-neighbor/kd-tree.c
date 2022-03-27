@@ -224,9 +224,11 @@ void *kdtree_min(kdtree_t *k_t, void *D) {
 }
 
 typedef struct SearchLinkedList {
+	int index;
+
 	void *payload;
 	struct SearchLinkedList *next;
-} s_ll_t
+} s_ll_t;
 /* search:
 	searches through kdtree_t *k_t to find closest related documents based on kd_payload (the search term)
 	-- k_node: the current document vector we are standing at within k_t
@@ -235,7 +237,7 @@ typedef struct SearchLinkedList {
 
 	returns a linked list of documents that were most related to kd_payload
 */
-s_ll_t *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void *search_payload, void *curr_s_ll, int max_document_returns) {
+s_ll_t *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void *search_payload, s_ll_t *curr_s_ll, int max_document_returns) {
 	if (!k_node)
 		return NULL;
 
@@ -255,10 +257,15 @@ s_ll_t *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, 
 	if (!curr_s_ll)
 		return NULL;
 
+	if (curr_s_ll->index + 1 == max_document_returns)
+		return curr_s_ll;
+
 	// if both sub pathes fail, just return the current k_node payload
 	if (curr_s_ll->payload == search_payload && search_both_pathes) {
 		if (curr_s_ll->payload) {
 			curr_s_ll->next = malloc(sizeof(s_ll_t));
+			curr_s_ll->next->index = curr_s_ll->index + 1;
+
 			curr_s_ll->next->payload = k_node->payload;
 			curr_s_ll->next->next = NULL;
 
@@ -271,7 +278,7 @@ s_ll_t *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, 
 	}
 
 	// some more casing to ensure we don't send duplicates
-	if (node_payload == search_payload)
+	if (k_node->payload == search_payload)
 		return curr_s_ll;
 	// next initiate comparisons to see which document vector would be best to return
 	void *curr_best_document_vector = k_t->member_extract(curr_s_ll->payload, dimension);
@@ -280,7 +287,7 @@ s_ll_t *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, 
 	// based on return payload, make some comparisons to see what to do next:
 	// check the split payload againt the best payload in the current dimension
 	float curr_best_v_node_distance = k_t->distance(node_termfreq, curr_best_document_vector);
-	float curr_best_v_search_meta_distance = k_t->meta_distance(search_poayload, curr_best->payload);
+	float curr_best_v_search_meta_distance = k_t->meta_distance(search_payload, curr_s_ll->payload);
 
 	// if the curr_node has a better percent similarity
 	if (curr_best_v_node_distance > curr_best_v_search_meta_distance) {
@@ -294,6 +301,8 @@ s_ll_t *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, 
 
 void *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_document_returns) {
 	s_ll_t *head_node = malloc(sizeof(s_ll_t));
+
+	head_node->index = 0;
 
 	head_node->payload = NULL;
 	head_node->next = NULL;

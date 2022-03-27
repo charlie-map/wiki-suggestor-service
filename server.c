@@ -203,7 +203,7 @@ void nearest_neighbor(req_t req, res_t res) {
 	kdtree_load(cluster_rep, (void ***) cluster_docs, closest_cluster->doc_pos_index);
 
 	// search for most relavant document:
-	document_vector_t *return_doc = kdtree_search(cluster_rep, d_1, curr_doc);
+	document_vector_t *return_doc = kdtree_search(cluster_rep, d_1, curr_doc, 1);
 
 	db_res_destroy(db_r);
 	db_r = db_query(db, "SELECT page_name FROM page WHERE id=?", return_doc->id);
@@ -277,8 +277,9 @@ void unique_recommend(req_t req, res_t res) {
 	free(user_cluster_wrapped);
 
 	// finding more than one?
-	hashmap *closest_doc_vector = kdtree_search(doc_vector_kdtree, doc_vector_kdtree_start_dimension, user_cluster->centroid, 3);
-
+	pthread_mutex_lock(&(mutex_doc_vector_kdtree->mutex));
+	hashmap *closest_doc_vector = kdtree_search(mutex_doc_vector_kdtree->runner, doc_vector_kdtree_start_dimension, user_cluster->centroid, 3);
+	pthread_mutex_unlock(&(mutex_doc_vector_kdtree->mutex));
 
 }
 
