@@ -272,9 +272,9 @@ s_ll_t *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, 
 
 	// some more casing to ensure we don't send duplicates
 	if (node_payload == search_payload)
-		return curr_best;
+		return curr_s_ll;
 	// next initiate comparisons to see which document vector would be best to return
-	void *curr_best_document_vector = k_t->member_extract(curr_best->payload, dimension);
+	void *curr_best_document_vector = k_t->member_extract(curr_s_ll->payload, dimension);
 
 
 	// based on return payload, make some comparisons to see what to do next:
@@ -282,10 +282,14 @@ s_ll_t *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, 
 	float curr_best_v_node_distance = k_t->distance(node_termfreq, curr_best_document_vector);
 	float curr_best_v_search_meta_distance = k_t->meta_distance(search_poayload, curr_best->payload);
 
-	if (curr_best_v_node_distance > curr_best_v_search_meta_distance)
-		return curr_best;
-	else
-		return k_node->payload;
+	// if the curr_node has a better percent similarity
+	if (curr_best_v_node_distance > curr_best_v_search_meta_distance) {
+		// send the curr_document_vector instead
+		return curr_s_ll;
+	} else {
+		curr_s_ll->payload = k_node->payload;
+		return curr_s_ll;
+	}
 }
 
 void *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_document_returns) {
