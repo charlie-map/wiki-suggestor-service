@@ -318,7 +318,6 @@ char **build_dimensions(void *curr_vector_group, char vector_type) {
 	char **keys = (char **) keys__hashmap(dimension_map, key_length, "");
 
 	for (int read_best = 0; read_best < cluster_size; read_best++) {
-
 		int best_stddev_pos = read_best;
 		float best_stddev; int best_doc_freq;
 
