@@ -4,6 +4,7 @@
 
 #include "kd-tree.h"
 #include "deserialize.h"
+#include "document-vector.h"
 
 typedef struct KD_Node {
 	void *payload;
@@ -223,12 +224,6 @@ void *kdtree_min(kdtree_t *k_t, void *D) {
 	return k_node->payload;
 }
 
-typedef struct SearchLinkedList {
-	int index;
-
-	void *payload;
-	struct SearchLinkedList *next;
-} s_ll_t;
 /* search:
 	searches through kdtree_t *k_t to find closest related documents based on kd_payload (the search term)
 	-- k_node: the current document vector we are standing at within k_t
@@ -240,26 +235,35 @@ typedef struct SearchLinkedList {
 s_ll_t *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void *search_payload, s_ll_t *curr_s_ll, int max_document_returns) {
 	if (!k_node)
 		return NULL;
+	printf("---next doc---%s\n", ((document_vector_t *) k_node->payload)->title);
+
+	printf("---curr dim---%s\n", (char *) dimension);
 
 	// look at current k_node and see which direction to go in:
 	void *node_termfreq = k_t->member_extract(k_node->payload, dimension);
 	void *search_termfreq = k_t->member_extract(search_payload, dimension);
 
 	int weight = k_t->weight(search_termfreq, node_termfreq);
+	printf("|--dir: %d\n", weight);
 
 	// based on weight choose a direction to proceed in:
 	int search_both_pathes = 0;
-	curr_s_ll = search_kdtree_helper(k_t, weight ? k_node->right : k_node->left, k_t->next_d(dimension), search_payload, curr_s_ll, max_document_returns);
-	if (!curr_s_ll || curr_s_ll->payload == search_payload) {
+	s_ll_t *next_s_ll = search_kdtree_helper(k_t, weight ? k_node->right : k_node->left, k_t->next_d(dimension), search_payload, curr_s_ll, max_document_returns);
+	if (!next_s_ll || next_s_ll->payload == search_payload) {
 		search_both_pathes = 1;
-		curr_s_ll = search_kdtree_helper(k_t, weight ? k_node->left : k_node->right, k_t->next_d(dimension), search_payload, curr_s_ll, max_document_returns);
+		next_s_ll = search_kdtree_helper(k_t, weight ? k_node->left : k_node->right, k_t->next_d(dimension), search_payload, curr_s_ll, max_document_returns);
 	}
-	if (!curr_s_ll)
-		return NULL;
 
-	if (curr_s_ll->index + 1 == max_document_returns)
-		return curr_s_ll;
+	if (!next_s_ll) {
+		curr_s_ll->payload = k_node->payload;
+		curr_s_ll->next = malloc(sizeof(s_ll_t));
 
+		curr_s_ll->next->index = curr_s_ll->index + 1;
+		return curr_s_ll->next;
+	}
+
+	curr_s_ll->payload = next_s_ll->payload;
+	curr_s_ll->next = next_s_ll->next;
 	// if both sub pathes fail, just return the current k_node payload
 	if (curr_s_ll->payload == search_payload && search_both_pathes) {
 		if (curr_s_ll->payload) {
@@ -278,7 +282,7 @@ s_ll_t *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, 
 	}
 
 	// some more casing to ensure we don't send duplicates
-	if (k_node->payload == search_payload)
+	if (k_node->payload == search_payload || curr_s_ll->index + 1 == max_document_returns)
 		return curr_s_ll;
 	// next initiate comparisons to see which document vector would be best to return
 	void *curr_best_document_vector = k_t->member_extract(curr_s_ll->payload, dimension);
@@ -299,7 +303,7 @@ s_ll_t *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, 
 	}
 }
 
-void *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_document_returns) {
+s_ll_t *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_document_returns) {
 	s_ll_t *head_node = malloc(sizeof(s_ll_t));
 
 	head_node->index = 0;
@@ -307,7 +311,10 @@ void *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_do
 	head_node->payload = NULL;
 	head_node->next = NULL;
 
-	return search_kdtree_helper(k_t, k_t->kd_head, dimension, kd_payload, head_node, max_document_returns);
+	search_kdtree_helper(k_t, k_t->kd_head, dimension, kd_payload, head_node, max_document_returns);
+
+	printf("%d\n", head_node);
+	return head_node;
 }
 
 // DFS for node

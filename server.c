@@ -20,8 +20,8 @@
 
 #include "teru.h"
 
-#define HOST "localhost"
-#define PORT "8888"
+#define HOST "*"
+#define PORT "4567"
 
 #define K 32
 #define CLUSTER_THRESHOLD 2
@@ -125,6 +125,8 @@ int main() {
 	index_write(index_writer, word_bag, word_bag_len, (hashmap *) term_freq->runner, *ID_len);
 	fclose(index_writer);
 
+	free(kdtree_document_vector_arr);
+
 	destroy_cluster(cluster, K);
 	deepdestroy__hashmap(doc_map);
 	deepdestroy__hashmap((hashmap *) term_freq->runner);
@@ -203,7 +205,7 @@ void nearest_neighbor(req_t req, res_t res) {
 	kdtree_load(cluster_rep, (void ***) cluster_docs, closest_cluster->doc_pos_index);
 
 	// search for most relavant document:
-	document_vector_t *return_doc = kdtree_search(cluster_rep, d_1, curr_doc, 1);
+	document_vector_t *return_doc = ((document_vector_t *) kdtree_search(cluster_rep, d_1, curr_doc, 1)->payload);
 
 	db_res_destroy(db_r);
 	db_r = db_query(db, "SELECT page_name FROM page WHERE id=?", return_doc->id);
@@ -241,6 +243,7 @@ void unique_recommend(req_t req, res_t res) {
 		return;
 	}
 
+	printf("%s\n", user_uuid);
 	db_res *db_r = db_query(db, "SELECT id, age FROM user WHERE unique_id=?", user_uuid);
 
 	if (!db_r->row_count) {
@@ -251,7 +254,8 @@ void unique_recommend(req_t req, res_t res) {
 	}
 
 	// grab user ID
-	char *user_ID = (char *) get__hashmap(db_r->row__data[0], "id", "");
+	char *buffer_user_ID = (char *) get__hashmap(db_r->row__data[0], "id", "");
+	char *user_ID = malloc(sizeof(char) * (strlen(buffer_user_ID) + 1)); strcpy(user_ID, buffer_user_ID);
 
 	db_res_destroy(db_r);
 
@@ -265,10 +269,11 @@ void unique_recommend(req_t req, res_t res) {
 		return;
 	}
 
+	printf("%d\n", db_r->row_count);
 	hashmap *sub_user_doc = make__hashmap(0, NULL, NULL);
 	for (int copy_document_vector = 0; copy_document_vector < db_r->row_count; copy_document_vector++) {
 		char *page_id = (char *) get__hashmap(db_r->row__data[copy_document_vector], "page_id", "");
-		insert__hashmap(sub_user_doc, page_id, get__hashmap(doc_map, page_id, ""), "", NULL, NULL);
+		insert__hashmap(sub_user_doc, page_id, get__hashmap(doc_map, page_id, ""), "", compareCharKey, NULL);
 	}
 
 	// otherwise we can move forward to computing a centroid
@@ -277,20 +282,29 @@ void unique_recommend(req_t req, res_t res) {
 	free(user_cluster_wrapped);
 
 	// finding more than one?
+	document_vector_t *user_doc_vec = malloc(sizeof(document_vector_t));
+	user_doc_vec->sqrt_mag = user_cluster->sqrt_mag;
+	user_doc_vec->map = user_cluster->centroid;
+
 	pthread_mutex_lock(&(mutex_doc_vector_kdtree->mutex));
-	hashmap *closest_doc_vector = kdtree_search(mutex_doc_vector_kdtree->runner, doc_vector_kdtree_start_dimension, user_cluster->centroid, 3);
+	s_ll_t *closest_doc_vector = kdtree_search(mutex_doc_vector_kdtree->runner, doc_vector_kdtree_start_dimension, user_doc_vec, 3);
 	pthread_mutex_unlock(&(mutex_doc_vector_kdtree->mutex));
 
+	for (s_ll_t *print_doc_vec = closest_doc_vector; print_doc_vec; print_doc_vec = print_doc_vec->next) {
+		printf("%s\n", ((document_vector_t *) print_doc_vec->payload)->title);
+	}
+
+	free(user_doc_vec);
 }
 
 // build_dimensions functionalities based on vector_type:
-int build_dimension_length(void *curr_vector_group, char vector_type) {
+float build_dimension_length(void *curr_vector_group, char vector_type) {
 	return log(vector_type == 'c' ? ((cluster_t *) curr_vector_group)->doc_pos_index : *word_bag_len) + 1;
 }
 
 hashmap *build_dimension_map(void *curr_vector_group, char vector_type) {
 	return vector_type == 'c' ? ((cluster_t *) curr_vector_group)->centroid :
-		((document_vector_t *) curr_vector_group)->map;
+		(hashmap *) curr_vector_group;
 }
 
 // vector type:

@@ -9,7 +9,14 @@ int kdtree_load(kdtree_t *k_t, void ***members, int member_length);
 void *kdtree_insert(kdtree_t *k_t, void *payload);
 
 void *kdtree_min(kdtree_t *k_t, void *D);
-void *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_document_returns);
+
+typedef struct SearchLinkedList {
+	int index;
+
+	void *payload;
+	struct SearchLinkedList *next;
+} s_ll_t;
+s_ll_t *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_document_returns);
 
 void *kdtree_delete(kdtree_t *k_t, void *k_node, ...);
 
