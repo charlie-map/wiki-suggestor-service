@@ -125,6 +125,8 @@ int main() {
 	index_write(index_writer, word_bag, word_bag_len, (hashmap *) term_freq->runner, *ID_len);
 	fclose(index_writer);
 
+	free(kdtree_document_vector_arr);
+
 	destroy_cluster(cluster, K);
 	deepdestroy__hashmap(doc_map);
 	deepdestroy__hashmap((hashmap *) term_freq->runner);
@@ -284,13 +286,13 @@ void unique_recommend(req_t req, res_t res) {
 }
 
 // build_dimensions functionalities based on vector_type:
-int build_dimension_length(void *curr_vector_group, char vector_type) {
+float build_dimension_length(void *curr_vector_group, char vector_type) {
 	return log(vector_type == 'c' ? ((cluster_t *) curr_vector_group)->doc_pos_index : *word_bag_len) + 1;
 }
 
 hashmap *build_dimension_map(void *curr_vector_group, char vector_type) {
 	return vector_type == 'c' ? ((cluster_t *) curr_vector_group)->centroid :
-		((document_vector_t *) curr_vector_group)->map;
+		(hashmap *) curr_vector_group;
 }
 
 // vector type:
@@ -304,7 +306,6 @@ char **build_dimensions(void *curr_vector_group, char vector_type) {
 	char **keys = (char **) keys__hashmap(dimension_map, key_length, "");
 
 	for (int read_best = 0; read_best < cluster_size; read_best++) {
-
 		int best_stddev_pos = read_best;
 		float best_stddev; int best_doc_freq;
 
