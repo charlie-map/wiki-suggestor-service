@@ -10,13 +10,17 @@ void *kdtree_insert(kdtree_t *k_t, void *payload);
 
 void *kdtree_min(kdtree_t *k_t, void *D);
 
-typedef struct SearchLinkedList {
-	int index;
-
+typedef struct SearchPriorityQueueNode {
 	void *payload;
-	struct SearchLinkedList *next;
-} s_ll_t;
-s_ll_t *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_document_returns);
+	struct SearchPriorityQueueNode *next;
+} s_pq_node_t;
+
+typedef struct SearchPriorityQueue {
+	int pq_size;
+
+	s_pq_node_t *min;
+} s_pq_t;
+s_pq_t *kdtree_search(kdtree_t *k_t, void *dimension, void *search_payload, int max_document_returns);
 
 void *kdtree_delete(kdtree_t *k_t, void *k_node, ...);
 

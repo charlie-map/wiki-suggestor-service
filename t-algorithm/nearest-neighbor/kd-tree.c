@@ -224,6 +224,43 @@ void *kdtree_min(kdtree_t *k_t, void *D) {
 	return k_node->payload;
 }
 
+int insert_pq(s_pq_t *head, void *payload) {
+	head->pq_size++;
+	// insert into head pos:
+	s_pq_node_t *min = head->min;
+
+	if (!min) {
+		head->min = malloc(sizeof(s_pq_node_t));
+		head->payload = payload;
+		head->next = NULL;
+		return 0;
+	}
+
+	s_pq_node_t *new_pq_node = malloc(sizeof(s_pq_node_t));
+	new_pq_node->payload = payload;
+	new_pq_node->next = min;
+
+	head->min = new_pq_node;
+}
+
+s_pq_node_t *skip(s_pq_t *head, int skip_amount) {
+	s_pq_node_t *curr = head->min;
+
+	for (int read_skip = 0; read_skip < skip_amount && curr; read_skip++) {
+		curr = curr->next;
+	}
+
+	return curr;
+}
+
+int node_curr_greater(float value, float *values, int value_len) {
+	for (int check_value = 0; check_value < value_len; check_value++) {
+		if (value < values[check_value])
+			return check_value;
+	}
+
+	return -1;
+}
 /* search:
 	searches through kdtree_t *k_t to find closest related documents based on kd_payload (the search term)
 	-- k_node: the current document vector we are standing at within k_t
@@ -232,9 +269,28 @@ void *kdtree_min(kdtree_t *k_t, void *D) {
 
 	returns a linked list of documents that were most related to kd_payload
 */
-s_ll_t *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void *search_payload, s_ll_t *curr_s_ll, int max_document_returns) {
-	if (!k_node)
-		return NULL;
+int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void *search_payload, s_pq_t *curr_s_ll, int max_document_returns, void **current_payloads) {
+	if (curr_s_ll->pq_size == max_document_returns)
+		return 0;
+
+	s_pq_node_t *new sub_value = malloc(sizeof(s_pq_node_t));
+	if (!k_node->right && !k_node->left) {
+		if (is_not_search_node(k_node->payload, current_payloads))
+			insert_pq(curr_s_ll, k_node->payload);
+
+		return 0;
+	} else if (!k_node->right) {
+		if (is_not_search_node(k_node->right->payload, current_payloads))
+			insert_pq(curr_s_ll, k_node->right->payload);
+
+		return 0;
+	} else if (!k_node->left) {
+		if (is_not_search_node(k_node->left->payload, current_payloads))
+			insert_pq(curr_s_ll, k_node->left->payload);
+
+		return 0;
+	}
+
 	printf("---next doc---%s\n", ((document_vector_t *) k_node->payload)->title);
 
 	printf("---curr dim---%s\n", (char *) dimension);
@@ -246,70 +302,28 @@ s_ll_t *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, 
 	int weight = k_t->weight(search_termfreq, node_termfreq);
 	printf("|--dir: %d\n", weight);
 
-	// based on weight choose a direction to proceed in:
-	int search_both_pathes = 0;
-	s_ll_t *next_s_ll = search_kdtree_helper(k_t, weight ? k_node->right : k_node->left, k_t->next_d(dimension), search_payload, curr_s_ll, max_document_returns);
-	if (!next_s_ll || next_s_ll->payload == search_payload) {
-		search_both_pathes = 1;
-		next_s_ll = search_kdtree_helper(k_t, weight ? k_node->left : k_node->right, k_t->next_d(dimension), search_payload, curr_s_ll, max_document_returns);
-	}
+	search_kdtree_helper(k_t, weight ? k_node->right : k_node->left, k_t->next_d(dimension), search_payload, curr_s_ll, max_document_returns);
 
-	if (!next_s_ll) {
-		curr_s_ll->payload = k_node->payload;
-		curr_s_ll->next = malloc(sizeof(s_ll_t));
+	float *meta_curr_document_distances = malloc(sizeof(float) * max_document_returns);
+	int read_curr_doc;
+	for (read_curr_doc = 0; skip(sub_s_ll, read_curr_doc); read_curr_doc++)
+		meta_curr_document_distances[read_curr_doc] = k_t->meta_distance(skip(sub_s_ll, read_curr_doc)->payload, search_payload);
+	float node_curr_document_distance = k_t->distance(k_t->member_extract(sub_s_ll->payload, dimension), k_t->member_extract(k_node->payload, dimension));
 
-		curr_s_ll->next->index = curr_s_ll->index + 1;
-		return curr_s_ll->next;
-	}
+	int worst_pos;
+	if ((worst_pos = node_curr_greater(node_curr_document_distance, meta_curr_document_distances, read_curr_doc)) == -1)
+		return 0;
 
-	curr_s_ll->payload = next_s_ll->payload;
-	curr_s_ll->next = next_s_ll->next;
-	// if both sub pathes fail, just return the current k_node payload
-	if (curr_s_ll->payload == search_payload && search_both_pathes) {
-		if (curr_s_ll->payload) {
-			curr_s_ll->next = malloc(sizeof(s_ll_t));
-			curr_s_ll->next->index = curr_s_ll->index + 1;
+	// otherwise see which one should be swapped out for the value at this position
+	skip(sub_s_ll, worst_pos)->payload = k_node->payload;
 
-			curr_s_ll->next->payload = k_node->payload;
-			curr_s_ll->next->next = NULL;
-
-			return curr_s_ll->next;
-		} else {
-			curr_s_ll->payload = k_node->payload;
-
-			return curr_s_ll;
-		}
-	}
-
-	// some more casing to ensure we don't send duplicates
-	if (k_node->payload == search_payload || curr_s_ll->index + 1 == max_document_returns)
-		return curr_s_ll;
-	// next initiate comparisons to see which document vector would be best to return
-	void *curr_best_document_vector = k_t->member_extract(curr_s_ll->payload, dimension);
-
-
-	// based on return payload, make some comparisons to see what to do next:
-	// check the split payload againt the best payload in the current dimension
-	float curr_best_v_node_distance = k_t->distance(node_termfreq, curr_best_document_vector);
-	float curr_best_v_search_meta_distance = k_t->meta_distance(search_payload, curr_s_ll->payload);
-
-	// if the curr_node has a better percent similarity
-	if (curr_best_v_node_distance > curr_best_v_search_meta_distance) {
-		// send the curr_document_vector instead
-		return curr_s_ll;
-	} else {
-		curr_s_ll->payload = k_node->payload;
-		return curr_s_ll;
-	}
+	return 0;
 }
 
-s_ll_t *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_document_returns) {
-	s_ll_t *head_node = malloc(sizeof(s_ll_t));
+s_pq_t *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_document_returns) {
+	s_pq_t *head_node = malloc(sizeof(s_ll_t));
 
-	head_node->index = 0;
-
-	head_node->payload = NULL;
-	head_node->next = NULL;
+	head_node->pq_size = 0;
 
 	search_kdtree_helper(k_t, k_t->kd_head, dimension, kd_payload, head_node, max_document_returns);
 
