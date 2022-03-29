@@ -261,6 +261,7 @@ void unique_recommend(req_t req, res_t res) {
 
 	// get page_id, vote, page_vote_time, and focus_time from view_vote table
 	db_r = db_query(db, "SELECT page_id, vote, page_vote_time, focus_time FROM view_vote WHERE user_id=?", user_ID);
+	free(user_ID);
 
 	if (!db_r->row_count) {
 		db_res_destroy(db_r);
@@ -281,7 +282,6 @@ void unique_recommend(req_t req, res_t res) {
 	// otherwise we can move forward to computing a centroid
 	cluster_t **user_cluster_wrapped = k_means(sub_user_doc, 1, CLUSTER_THRESHOLD);
 	cluster_t *user_cluster = *user_cluster_wrapped;
-	free(user_cluster_wrapped);
 
 	// finding more than one?
 	document_vector_t *user_doc_vec = malloc(sizeof(document_vector_t));
@@ -297,7 +297,7 @@ void unique_recommend(req_t req, res_t res) {
 	doc_titles[0] = '[';
 	doc_titles[1] = '\0';
 
-	for (s_pq_node_t *start_doc = closest_doc_vector->min; start_doc; start_doc = start_doc->next) {
+	for (s_pq_node_t *start_doc = closest_doc_vector->min; start_doc;) {
 		int new_len = strlen(((document_vector_t *) start_doc->payload)->title) + 3;
 		doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + new_len));
 		sprintf(doc_titles + sizeof(char) * (curr_doc_titles_len - 1),
@@ -308,6 +308,10 @@ void unique_recommend(req_t req, res_t res) {
 			doc_titles[curr_doc_titles_len - 2] = ',';
 
 		doc_titles[curr_doc_titles_len - 1] = '\0';
+
+		s_pq_node_t *next = start_doc->next;
+		free(start_doc);
+		start_doc = next;
 	}
 
 	doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + 1));
@@ -315,9 +319,18 @@ void unique_recommend(req_t req, res_t res) {
 
 	printf("%s\n", doc_titles);
 
+	free(closest_doc_vector);
 	free(user_doc_vec);
 
+	db_res_destroy(db_r);
+
+	// destroy user maps
+	deepdestroy__hashmap(sub_user_doc);
+	destroy_cluster(user_cluster_wrapped, 1);
+
 	res_end(res, doc_titles);
+
+	free(doc_titles);
 	return;
 }
 
