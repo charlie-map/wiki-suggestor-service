@@ -314,6 +314,11 @@ int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void
 
 	search_kdtree_helper(k_t, weight ? k_node->right : k_node->left, k_t->next_d(dimension), search_payload, curr_s_ll, max_document_returns, current_payloads, number_of_payloads);
 
+	// if pq isn't full, add k_node anyways
+	if (curr_s_ll->pq_size < max_document_returns) {
+		return insert_pq(curr_s_ll, k_node->payload);
+	}
+
 	float *meta_curr_document_distances = malloc(sizeof(float) * max_document_returns);
 	float *node_curr_document_distance = malloc(sizeof(float) * max_document_returns);
 	int read_curr_doc;
@@ -323,23 +328,29 @@ int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void
 	}	
 
 	int worst_pos;
-	if ((worst_pos = node_curr_greater(node_curr_document_distance, meta_curr_document_distances, read_curr_doc)) == -1)
+	if ((worst_pos = node_curr_greater(node_curr_document_distance, meta_curr_document_distances, read_curr_doc)) == -1) {
+		free(meta_curr_document_distances);
+		free(node_curr_document_distance);
+
 		return 0;
+	}
 
 	// otherwise see which one should be swapped out for the value at this position
 	skip(curr_s_ll, worst_pos)->payload = k_node->payload;
 
+	free(meta_curr_document_distances);
+	free(node_curr_document_distance);
 	return 0;
 }
 
 s_pq_t *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_document_returns, void **current_payloads, int number_of_payloads) {
 	s_pq_t *head_node = malloc(sizeof(s_pq_t));
 
+	head_node->min = NULL;
 	head_node->pq_size = 0;
 
 	search_kdtree_helper(k_t, k_t->kd_head, dimension, kd_payload, head_node, max_document_returns, current_payloads, number_of_payloads);
 
-	printf("%d\n", head_node);
 	return head_node;
 }
 

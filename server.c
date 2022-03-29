@@ -292,11 +292,30 @@ void unique_recommend(req_t req, res_t res) {
 	s_pq_t *closest_doc_vector = kdtree_search(mutex_doc_vector_kdtree->runner, doc_vector_kdtree_start_dimension, user_doc_vec, 3, (void **) full_document_vectors, db_r->row_count);
 	pthread_mutex_unlock(&(mutex_doc_vector_kdtree->mutex));
 
+	int curr_doc_titles_len = 2;
+	char *doc_titles = malloc(sizeof(char) * curr_doc_titles_len);
+	doc_titles[0] = '[';
+	doc_titles[1] = '\0';
+
 	for (s_pq_node_t *start_doc = closest_doc_vector->min; start_doc; start_doc = start_doc->next) {
-		printf("%s\n", ((document_vector_t *) start_doc->payload)->title);
+		int new_len = strlen(((document_vector_t *) start_doc->payload)->title) + 3 + (start_doc->next ? 1 : 0);
+		doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + new_len));
+		doc_titles[curr_doc_titles_len] = '"';
+		sprintf(doc_titles + sizeof(char) * curr_doc_titles_len,
+			"%c%s%c", '"', ((document_vector_t *) start_doc->payload)->title, '"');
+		
+		curr_doc_titles_len += new_len;
+		if (start_doc->next)
+			doc_titles[curr_doc_titles_len - 2] = ',';
+
+		doc_titles[curr_doc_titles_len - 1] = '\0';
 	}
 
+	printf("%s\n", doc_titles);
+
 	free(user_doc_vec);
+
+
 }
 
 // build_dimensions functionalities based on vector_type:
@@ -380,8 +399,8 @@ int weight(void *map1_val, void *map2_val) {
 }
 
 float distance(void *doc1_termfreq, void *doc2_termfreq) {
-	float doc1_freq = *(float *) doc1_termfreq;
-	float doc2_freq = *(float *) doc2_termfreq;
+	float doc1_freq = doc1_termfreq ? *(float *) doc1_termfreq : 0;
+	float doc2_freq = doc2_termfreq ? *(float *) doc2_termfreq : 0;
 
 	float cosine_sim = (doc1_freq + doc2_freq) / ((doc1_freq * doc1_freq) + (doc2_freq * doc2_freq));
 
