@@ -298,12 +298,11 @@ void unique_recommend(req_t req, res_t res) {
 	doc_titles[1] = '\0';
 
 	for (s_pq_node_t *start_doc = closest_doc_vector->min; start_doc; start_doc = start_doc->next) {
-		int new_len = strlen(((document_vector_t *) start_doc->payload)->title) + 3 + (start_doc->next ? 1 : 0);
+		int new_len = strlen(((document_vector_t *) start_doc->payload)->title) + 3;
 		doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + new_len));
-		doc_titles[curr_doc_titles_len] = '"';
-		sprintf(doc_titles + sizeof(char) * curr_doc_titles_len,
-			"%c%s%c", '"', ((document_vector_t *) start_doc->payload)->title, '"');
-		
+		sprintf(doc_titles + sizeof(char) * (curr_doc_titles_len - 1),
+			"%c%s%c", '\"', ((document_vector_t *) start_doc->payload)->title, '\"');
+
 		curr_doc_titles_len += new_len;
 		if (start_doc->next)
 			doc_titles[curr_doc_titles_len - 2] = ',';
@@ -311,11 +310,15 @@ void unique_recommend(req_t req, res_t res) {
 		doc_titles[curr_doc_titles_len - 1] = '\0';
 	}
 
+	doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + 1));
+	strcat(doc_titles, "]");
+
 	printf("%s\n", doc_titles);
 
 	free(user_doc_vec);
 
-
+	res_end(res, doc_titles);
+	return;
 }
 
 // build_dimensions functionalities based on vector_type:
