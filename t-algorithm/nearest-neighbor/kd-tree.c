@@ -280,7 +280,7 @@ int node_curr_greater(float *node_curr_values, float *meta_curr_values, int valu
 
 	returns a linked list of documents that were most related to kd_payload
 */
-int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void *search_payload, s_pq_t *curr_s_ll, int max_document_returns, void **current_payloads) {
+int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void *search_payload, s_pq_t *curr_s_ll, int max_document_returns, void **current_payloads, int number_of_payloads) {
 	if (curr_s_ll->pq_size == max_document_returns)
 		return 0;
 
@@ -312,7 +312,7 @@ int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void
 	int weight = k_t->weight(search_termfreq, node_termfreq);
 	printf("|--dir: %d\n", weight);
 
-	search_kdtree_helper(k_t, weight ? k_node->right : k_node->left, k_t->next_d(dimension), search_payload, curr_s_ll, max_document_returns, current_payloads);
+	search_kdtree_helper(k_t, weight ? k_node->right : k_node->left, k_t->next_d(dimension), search_payload, curr_s_ll, max_document_returns, current_payloads, number_of_payloads);
 
 	float *meta_curr_document_distances = malloc(sizeof(float) * max_document_returns);
 	float *node_curr_document_distance = malloc(sizeof(float) * max_document_returns);
@@ -332,12 +332,12 @@ int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void
 	return 0;
 }
 
-s_pq_t *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_document_returns, void **current_payloads) {
+s_pq_t *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_document_returns, void **current_payloads, int number_of_payloads) {
 	s_pq_t *head_node = malloc(sizeof(s_pq_t));
 
 	head_node->pq_size = 0;
 
-	search_kdtree_helper(k_t, k_t->kd_head, dimension, kd_payload, head_node, max_document_returns, current_payloads);
+	search_kdtree_helper(k_t, k_t->kd_head, dimension, kd_payload, head_node, max_document_returns, current_payloads, number_of_payloads);
 
 	printf("%d\n", head_node);
 	return head_node;

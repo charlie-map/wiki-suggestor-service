@@ -205,7 +205,7 @@ void nearest_neighbor(req_t req, res_t res) {
 	kdtree_load(cluster_rep, (void ***) cluster_docs, closest_cluster->doc_pos_index);
 
 	// search for most relavant document:
-	document_vector_t *return_doc = ((document_vector_t *) kdtree_search(cluster_rep, d_1, curr_doc, 1, (void **) &curr_doc)->min->payload);
+	document_vector_t *return_doc = ((document_vector_t *) kdtree_search(cluster_rep, d_1, curr_doc, 1, (void **) &curr_doc, 1)->min->payload);
 
 	db_res_destroy(db_r);
 	db_r = db_query(db, "SELECT page_name FROM page WHERE id=?", return_doc->id);
@@ -271,7 +271,7 @@ void unique_recommend(req_t req, res_t res) {
 
 	printf("%d\n", db_r->row_count);
 	hashmap *sub_user_doc = make__hashmap(0, NULL, NULL);
-	document_vector_t **full_document_vectors = malloc(sizeof(document_vector_t *) * 3);
+	document_vector_t **full_document_vectors = malloc(sizeof(document_vector_t *) * db_r->row_count);
 	for (int copy_document_vector = 0; copy_document_vector < db_r->row_count; copy_document_vector++) {
 		char *page_id = (char *) get__hashmap(db_r->row__data[copy_document_vector], "page_id", "");
 		full_document_vectors[copy_document_vector] = get__hashmap(doc_map, page_id, "");
@@ -289,7 +289,7 @@ void unique_recommend(req_t req, res_t res) {
 	user_doc_vec->map = user_cluster->centroid;
 
 	pthread_mutex_lock(&(mutex_doc_vector_kdtree->mutex));
-	s_pq_t *closest_doc_vector = kdtree_search(mutex_doc_vector_kdtree->runner, doc_vector_kdtree_start_dimension, user_doc_vec, 3, (void **) full_document_vectors);
+	s_pq_t *closest_doc_vector = kdtree_search(mutex_doc_vector_kdtree->runner, doc_vector_kdtree_start_dimension, user_doc_vec, 3, (void **) full_document_vectors, db_r->row_count);
 	pthread_mutex_unlock(&(mutex_doc_vector_kdtree->mutex));
 
 	for (s_pq_node_t *start_doc = closest_doc_vector->min; start_doc; start_doc = start_doc->next) {
