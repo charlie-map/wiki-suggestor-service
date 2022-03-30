@@ -97,7 +97,7 @@ char *token_attr(token_t *token, char *attr) {
 	int read_attr;
 	for (read_attr = 0; read_attr < token->attr_tag_index; read_attr++) {
 		if (strcmp(token->attribute[read_attr], attr) == 0)
-			return token->attribute[read_attr];
+			return token->attribute[read_attr + 1];
 	}
 
 	return NULL;
@@ -331,8 +331,11 @@ int has_attr_value(char **attribute, int attr_len, char *attr, char *attr_value)
 	if (attr_pos == attr_len)
 		return 0;
 
+	attr_pos++;
+	printf("check attr: %s v. %s ", attribute[attr_pos], attr_value);
+
 	int *classlist_len = malloc(sizeof(int));
-	char **classlist = split_string(attribute[attr_pos], ' ', classlist_len, "");
+	char **classlist = split_string(attribute[attr_pos], ' ', classlist_len, "-r", mirror);
 
 	int found_class = 0;
 	for (int check_classlist = 0; check_classlist < *classlist_len; check_classlist++) {
@@ -344,6 +347,8 @@ int has_attr_value(char **attribute, int attr_len, char *attr, char *attr_value)
 
 	free(classlist);
 	free(classlist_len);
+
+	printf("%d\n", found_class);
 
 	return found_class;
 }

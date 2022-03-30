@@ -4,6 +4,10 @@
 
 #include "helper.h"
 
+int mirror(int t, ...) {
+	return 1;
+}
+
 void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_size) {
 	while (curr_index >= *max_len) {
 		*max_len *= 2;

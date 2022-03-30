@@ -1,6 +1,9 @@
 #ifndef __HELPER_L__
 #define __HELPER_L__
 
+/* MIRROR FUNCTION */
+int mirror(int t, ...);
+
 /* RESIZE FUNCTIONALITY */
 void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_size);
 

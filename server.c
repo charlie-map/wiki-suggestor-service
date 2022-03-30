@@ -138,7 +138,7 @@ int main() {
 	free(word_bag_len);
 	free(word_bag);
 
-	// mysql_close(db);
+	mysql_close(db);
 
 	return 0;
 }
@@ -304,9 +304,9 @@ void unique_recommend(req_t req, res_t res) {
 		document_vector_t *curr_doc_vec = (document_vector_t *) start_doc->payload;
 
 		db_res *db_doc = db_query(db, "SELECT wiki_page FROM page WHERE id=?", curr_doc_vec->id);
-		
+
 		token_t *token_curr_doc_vec = tokenize('s', (char *) get__hashmap(db_doc->row__data[0], "wiki_page", ""));
-		
+
 		db_res_destroy(db_doc);
 		// a couple of data items we can grab:
 		// first image we encounter
@@ -318,7 +318,11 @@ void unique_recommend(req_t req, res_t res) {
 		// then select p tags, (maybe look at first couple?)
 		// need a way to selectively choose if skips should occur
 		int *document_intro_len = malloc(sizeof(int));
+		printf("CLASS %d\n", get_mw_parser_output);
+		token_t *tag_match = grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match);
+		printf("class %d to tag %d\n", get_mw_parser_output, tag_match);
 		char *document_intro = token_read_all_data(grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match), document_intro_len, NULL, NULL);
+		
 
 		int new_len = strlen(curr_doc_vec->title) + strlen(image_url) + *document_intro_len + 32;
 
