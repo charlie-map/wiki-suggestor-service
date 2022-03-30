@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "token.h"
+#include "../utils/helper.h"
 
 void *resize_arraylist(void *array, int *max_size, int current_index, size_t singleton_size) {
 	while (current_index >= *max_size) {
@@ -295,6 +296,65 @@ char *token_read_all_data(token_t *search_token, int *data_max, void *block_tag,
 	char *pull_data = *full_data;
 	free(full_data);
 	return pull_data;
+}
+
+int has_classname(char **attribute, int attr_len, char *classname) {
+	int attr_pos;
+	for (attr_pos = 0; attr_pos < attr_len; attr_pos += 2) {
+		if (strcmp(attribute[attr_pos], "class") == 0)
+			break;
+	}
+
+	if (attr_pos == attr_len)
+		return 0;
+
+	int *classlist_len = malloc(sizeof(int));
+	char **classlist = split_string(attribute[attr_pos], ' ', classlist_len, "");
+
+	int found_class = 0;
+	for (int check_classlist = 0; check_classlist < *classlist_len; check_classlist++) {
+		if (strcmp(classlist[check_classlist], classname) == 0)
+			found_class = 1;
+
+		free(classlist[check_classlist]);
+	}
+
+	free(classlist);
+	free(classlist_len);
+
+	return found_class;
+}
+
+token_t *grab_token_by_classname_children(token_t *start_token, char *classname) {
+	// if it doesn't exists, return NULL
+	for (int check_children = 0; check_children < start_token->children_index; check_children++) {
+		// compare tag:
+		if (has_classname(start_token->children[check_children]->attribute,
+			start_token->children[check_children]->attr_tag_index, classname))
+			return start_token->children[check_children];
+	}
+
+	// otherwise check children
+	for (int bfs_children = 0; bfs_children < start_token->children_index; bfs_children++) {
+		token_t *check_children_token = grab_token_by_classname_children(start_token->children[bfs_children], classname);
+
+		if (check_children_token)
+			return check_children_token;
+	}
+
+	return NULL;
+}
+// takes current search token and searches for the attribute `class=classname`
+// will return first occurrence of a token that has that classname
+token_t *grab_token_by_classname(token_t *search_token, char *classname) {
+	if (has_classname(search_token->attribute, search_token->attr_tag_index, classname))
+		return search_token;
+	// after checking current classname list, run through children
+
+	if (search_token->children_index)
+		return grab_token_by_classname(search_token, classname);
+	
+	return NULL
 }
 
 int read_main_tag(char **main_tag, char *curr_line, int search_tag) {

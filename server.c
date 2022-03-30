@@ -299,9 +299,21 @@ void unique_recommend(req_t req, res_t res) {
 
 	for (s_pq_node_t *start_doc = closest_doc_vector->min; start_doc;) {
 		int new_len = strlen(((document_vector_t *) start_doc->payload)->title) + 3;
+		document_vector_t *curr_doc_vec = (document_vector_t *) start_doc->payload;
+
+		db_doc_vec = db_query("SELECT wiki_page FROM page WHERE id=?", curr_doc_vec->id);
+		
+		token_t *token_curr_doc_vec = tokenize((char *) get__hashmap(db_doc_vec, "wiki_page", ""), 's');
+		// a couple of data items we can grab:
+		// first image we encounter
+		token_t *get_first_image = grab_token_by_tag(token_curr_doc_vec, "img");
+		// first couple blips of text within first p tag in div.mw-parser-output
+
+		int new_len = strlen(curr_doc_vec->title) + 3;
+
 		doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + new_len));
 		sprintf(doc_titles + sizeof(char) * (curr_doc_titles_len - 1),
-			"%c%s%c", '\"', ((document_vector_t *) start_doc->payload)->title, '\"');
+			"\"%s\"", ((document_vector_t *) start_doc->payload)->title);
 
 		curr_doc_titles_len += new_len;
 		if (start_doc->next)
