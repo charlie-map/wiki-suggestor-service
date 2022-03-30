@@ -232,6 +232,9 @@ void nearest_neighbor(req_t req, res_t res) {
 	return;
 }
 
+int p_tag_match(token_t *t) {
+	return !token_has_classname(t, "mw-empty-elt");
+}
 // expects user unique ID (uuid form) which connects to then selecting all documents
 // they have viewed thus far
 void unique_recommend(req_t req, res_t res) {
@@ -307,13 +310,20 @@ void unique_recommend(req_t req, res_t res) {
 		// a couple of data items we can grab:
 		// first image we encounter
 		token_t *get_first_image = grab_token_by_tag(token_curr_doc_vec, "img");
+		char *image_url = token_attr(get_first_image, "src") + sizeof(char) * 2;
 		// first couple blips of text within first p tag in div.mw-parser-output
 
-		int new_len = strlen(curr_doc_vec->title) + 3;
+		token_t *get_mw_parser_output = grab_token_by_classname(token_curr_doc_vec, "mw-parser-output");
+		// then select p tags, (maybe look at first couple?)
+		// need a way to selectively choose if skips should occur
+		int *document_intro_len = malloc(sizeof(int));
+		char *document_intro = token_read_all_data(grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match), document_intro_len, NULL, NULL);
+
+		int new_len = strlen(curr_doc_vec->title) + strlen(image_url) + *document_intro_len + 32;
 
 		doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + new_len));
 		sprintf(doc_titles + sizeof(char) * (curr_doc_titles_len - 1),
-			"\"%s\"", ((document_vector_t *) start_doc->payload)->title);
+			"{title:\"%s\",image:\"%s\",descript:\"%s\"}", ((document_vector_t *) start_doc->payload)->title, image_url, document_intro);
 
 		curr_doc_titles_len += new_len;
 		if (start_doc->next)

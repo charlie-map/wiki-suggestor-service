@@ -92,6 +92,17 @@ int add_token_attribute(token_t *token, char *tag, char *attribute) {
 	return 0;
 }
 
+char *token_attr(token_t *token, char *attr) {
+	// search for attr
+	int read_attr;
+	for (read_attr = 0; read_attr < token->attr_tag_index; read_attr++) {
+		if (strcmp(token->attribute[read_attr], attr) == 0)
+			return token->attribute[read_attr];
+	}
+
+	return NULL;
+}
+
 int add_token_children(token_t *token_parent, token_t *child) {
 	token_parent->children[token_parent->children_index] = child;
 
@@ -127,12 +138,12 @@ char *data_at_token(token_t *curr_token) {
 	return curr_token->data;
 }
 
-token_t *grab_token_by_tag(token_t *start_token, char *tag_name) {
+token_t *grab_token_by_tag_helper(token_t *start_token, char *tag_name, int (*is_match)(token_t *)) {
 	// search for first occurence of token with tag name == tag_name
 	// if it doesn't exists, return NULL
 	for (int check_children = 0; check_children < start_token->children_index; check_children++) {
 		// compare tag:
-		if (strcmp(start_token->children[check_children]->tag, tag_name) == 0)
+		if (strcmp(start_token->children[check_children]->tag, tag_name) == 0 && is_match(start_token->children[check_children]))
 			return start_token->children[check_children];
 	}
 
@@ -145,6 +156,18 @@ token_t *grab_token_by_tag(token_t *start_token, char *tag_name) {
 	}
 
 	return NULL;
+}
+
+int matcher_true(token_t *token) {
+	return 1;
+}
+
+token_t *grab_token_by_tag(token_t *start_token, char *tag_name) {
+	return grab_tokens_by_tag_helper(start_token, tag_name, matcher_true);
+}
+
+token_t *grab_token_by_tag_matchparam(token_t *start_token, char *tag_name, int (*match)(token_t *)) {
+	return grab_tokens_by_tag_helper(start_token, tag_name, match);
 }
 
 int grab_tokens_by_tag_helper(token_t **specific_token_builder, int *spec_token_max, int spec_token_index, token_t *start_token, char *tag_name) {
@@ -298,10 +321,10 @@ char *token_read_all_data(token_t *search_token, int *data_max, void *block_tag,
 	return pull_data;
 }
 
-int has_classname(char **attribute, int attr_len, char *classname) {
+int has_attr_value(char **attribute, int attr_len, char *attr, char *attr_value) {
 	int attr_pos;
 	for (attr_pos = 0; attr_pos < attr_len; attr_pos += 2) {
-		if (strcmp(attribute[attr_pos], "class") == 0)
+		if (strcmp(attribute[attr_pos], attr) == 0)
 			break;
 	}
 
@@ -313,7 +336,7 @@ int has_classname(char **attribute, int attr_len, char *classname) {
 
 	int found_class = 0;
 	for (int check_classlist = 0; check_classlist < *classlist_len; check_classlist++) {
-		if (strcmp(classlist[check_classlist], classname) == 0)
+		if (strcmp(classlist[check_classlist], attr_value) == 0)
 			found_class = 1;
 
 		free(classlist[check_classlist]);
@@ -325,7 +348,13 @@ int has_classname(char **attribute, int attr_len, char *classname) {
 	return found_class;
 }
 
-token_t *grab_token_by_classname_children(token_t *start_token, char *classname) {
+int token_has_classname(token_t *token, char *classname) {
+	return has_classname(token->attribute, token->attr_tag_index, "class", classname);
+}
+
+// takes current search token and searches for the attribute `class=classname`
+// will return first occurrence of a token that has that classname
+token_t *grab_token_by_classname(token_t *start_token, char *classname) {
 	// if it doesn't exists, return NULL
 	for (int check_children = 0; check_children < start_token->children_index; check_children++) {
 		// compare tag:
@@ -343,18 +372,6 @@ token_t *grab_token_by_classname_children(token_t *start_token, char *classname)
 	}
 
 	return NULL;
-}
-// takes current search token and searches for the attribute `class=classname`
-// will return first occurrence of a token that has that classname
-token_t *grab_token_by_classname(token_t *search_token, char *classname) {
-	if (has_classname(search_token->attribute, search_token->attr_tag_index, classname))
-		return search_token;
-	// after checking current classname list, run through children
-
-	if (search_token->children_index)
-		return grab_token_by_classname(search_token, classname);
-	
-	return NULL
 }
 
 int read_main_tag(char **main_tag, char *curr_line, int search_tag) {
