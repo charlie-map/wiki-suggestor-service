@@ -163,11 +163,11 @@ int matcher_true(token_t *token) {
 }
 
 token_t *grab_token_by_tag(token_t *start_token, char *tag_name) {
-	return grab_tokens_by_tag_helper(start_token, tag_name, matcher_true);
+	return grab_token_by_tag_helper(start_token, tag_name, matcher_true);
 }
 
 token_t *grab_token_by_tag_matchparam(token_t *start_token, char *tag_name, int (*match)(token_t *)) {
-	return grab_tokens_by_tag_helper(start_token, tag_name, match);
+	return grab_token_by_tag_helper(start_token, tag_name, match);
 }
 
 int grab_tokens_by_tag_helper(token_t **specific_token_builder, int *spec_token_max, int spec_token_index, token_t *start_token, char *tag_name) {
@@ -349,7 +349,7 @@ int has_attr_value(char **attribute, int attr_len, char *attr, char *attr_value)
 }
 
 int token_has_classname(token_t *token, char *classname) {
-	return has_classname(token->attribute, token->attr_tag_index, "class", classname);
+	return has_attr_value(token->attribute, token->attr_tag_index, "class", classname);
 }
 
 // takes current search token and searches for the attribute `class=classname`
@@ -358,14 +358,14 @@ token_t *grab_token_by_classname(token_t *start_token, char *classname) {
 	// if it doesn't exists, return NULL
 	for (int check_children = 0; check_children < start_token->children_index; check_children++) {
 		// compare tag:
-		if (has_classname(start_token->children[check_children]->attribute,
-			start_token->children[check_children]->attr_tag_index, classname))
+		if (has_attr_value(start_token->children[check_children]->attribute,
+			start_token->children[check_children]->attr_tag_index, "class", classname))
 			return start_token->children[check_children];
 	}
 
 	// otherwise check children
 	for (int bfs_children = 0; bfs_children < start_token->children_index; bfs_children++) {
-		token_t *check_children_token = grab_token_by_classname_children(start_token->children[bfs_children], classname);
+		token_t *check_children_token = grab_token_by_classname(start_token->children[bfs_children], classname);
 
 		if (check_children_token)
 			return check_children_token;
@@ -633,7 +633,7 @@ tag_reader read_tag(token_t *parent_tree, FILE *file, char *str_read, char **cur
 	return tag_read;
 }
 
-int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree, char *ID) {
+int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree) {
 	int search_token = 0;
 
 	size_t *buffer_size = malloc(sizeof(size_t));
@@ -699,7 +699,7 @@ int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree, char *ID) {
 	'f' for file reading
 	's' for char * reading
 */
-token_t *tokenize(char reader_type, char *filename, char *ID) {
+token_t *tokenize(char reader_type, char *filename) {
 	FILE *file = NULL;
 
 	if (reader_type == 'f')
@@ -709,7 +709,7 @@ token_t *tokenize(char reader_type, char *filename, char *ID) {
 	strcpy(root_tag, "root");
 	token_t *curr_tree = create_token(root_tag, NULL);
 
-	tokenizeMETA(file, filename, curr_tree, ID);
+	tokenizeMETA(file, filename, curr_tree);
 
 	if (file)
 		fclose(file);

@@ -171,7 +171,7 @@ void nearest_neighbor(req_t req, res_t res) {
 
 		sprintf(full_page, "<page>\n<id>%s</id>\n<title>%s</title>\n<text>%s</text>\n</page>", curr_docID, page_title, page_text);
 
-		token_t *token_wiki_page = tokenize('s',full_page, "");
+		token_t *token_wiki_page = tokenize('s',full_page);
 
 		curr_doc = create_document_vector(curr_docID, page_title, 0);
 
@@ -212,7 +212,7 @@ void nearest_neighbor(req_t req, res_t res) {
 
 	char *page_name_tag = (char *) get__hashmap(db_r->row__data[0], "page_name", "");
 
-	token_t *page_token = tokenize('s', page_name_tag, "");
+	token_t *page_token = tokenize('s', page_name_tag);
 
 	int *page_name_len = malloc(sizeof(int));
 	char *page_name = token_read_all_data(page_token, page_name_len, NULL, NULL);
@@ -301,12 +301,13 @@ void unique_recommend(req_t req, res_t res) {
 	doc_titles[1] = '\0';
 
 	for (s_pq_node_t *start_doc = closest_doc_vector->min; start_doc;) {
-		int new_len = strlen(((document_vector_t *) start_doc->payload)->title) + 3;
 		document_vector_t *curr_doc_vec = (document_vector_t *) start_doc->payload;
 
-		db_doc_vec = db_query("SELECT wiki_page FROM page WHERE id=?", curr_doc_vec->id);
+		db_res *db_doc = db_query(db, "SELECT wiki_page FROM page WHERE id=?", curr_doc_vec->id);
 		
-		token_t *token_curr_doc_vec = tokenize((char *) get__hashmap(db_doc_vec, "wiki_page", ""), 's');
+		token_t *token_curr_doc_vec = tokenize('s', (char *) get__hashmap(db_doc->row__data[0], "wiki_page", ""));
+		
+		db_res_destroy(db_doc);
 		// a couple of data items we can grab:
 		// first image we encounter
 		token_t *get_first_image = grab_token_by_tag(token_curr_doc_vec, "img");

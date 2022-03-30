@@ -3,7 +3,7 @@
 
 typedef struct Token token_t;
 
-token_t *tokenize(char reader_type, char *filename, char *ID);
+token_t *tokenize(char reader_type, char *filename);
 
 int token_has_classname(token_t *token, char *classname);
 
