@@ -319,6 +319,7 @@ void unique_recommend(req_t req, res_t res) {
 
 	printf("%s\n", doc_titles);
 
+	free(full_document_vectors);
 	free(closest_doc_vector);
 	free(user_doc_vec);
 
