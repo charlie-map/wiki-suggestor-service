@@ -301,16 +301,11 @@ int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void
 		return 0;
 	}
 
-	printf("---next doc---%s\n", ((document_vector_t *) k_node->payload)->title);
-
-	printf("---curr dim---%s\n", (char *) dimension);
-
 	// look at current k_node and see which direction to go in:
 	void *node_termfreq = k_t->member_extract(k_node->payload, dimension);
 	void *search_termfreq = k_t->member_extract(search_payload, dimension);
 
 	int weight = k_t->weight(search_termfreq, node_termfreq);
-	printf("|--dir: %d\n", weight);
 
 	search_kdtree_helper(k_t, weight ? k_node->right : k_node->left, k_t->next_d(dimension), search_payload, curr_s_ll, max_document_returns, current_payloads, number_of_payloads);
 
@@ -325,7 +320,7 @@ int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void
 	for (read_curr_doc = 0; skip(curr_s_ll, read_curr_doc); read_curr_doc++) {
 		meta_curr_document_distances[read_curr_doc] = k_t->meta_distance(skip(curr_s_ll, read_curr_doc)->payload, search_payload);
 		node_curr_document_distance[read_curr_doc] = k_t->distance(k_t->member_extract(skip(curr_s_ll, read_curr_doc)->payload, dimension), k_t->member_extract(k_node->payload, dimension));
-	}	
+	}
 
 	int worst_pos;
 	if ((worst_pos = node_curr_greater(node_curr_document_distance, meta_curr_document_distances, read_curr_doc)) == -1) {

@@ -50,6 +50,9 @@ int delimeter_check(char curr_char, char *delims) {
 		checks for range: default is (with chars) first one:
 				number range as well is second one:
 		use: "-r" to access range functions
+	should_lowercase:
+		used for deciding if a value should be lowercased
+		use: "-c" to turn this to false (defaults to true)
 */
 	int char_is_range(char _char) {
 		return (((int) _char >= 65 && (int) _char <= 90) || ((int) _char >= 97 && (int) _char <= 122));
@@ -72,6 +75,8 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 
 	int (*is_range)(char _char) = char_is_range;
 
+	int should_lowercase = 1;
+
 	for (int check_extra = 0; extra[check_extra]; check_extra++) {
 		if (extra[check_extra] != '-')
 			continue;
@@ -83,7 +88,8 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 			multi_delims = va_arg(param, char *);
 		} else if (extra[check_extra + 1] == 'r') {
 			is_range = va_arg(param, int (*)(char));
-		}
+		} else if (extra[check_extra + 1] == 'c')
+			should_lowercase = 0;
 	}
 
 	int arr_index = 0;
@@ -132,7 +138,7 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 			continue;
 
 		// if a capital letter, lowercase
-		if ((int) full_string[read_string] <= 90 && (int) full_string[read_string] >= 65)
+		if (should_lowercase && (int) full_string[read_string] <= 90 && (int) full_string[read_string] >= 65)
 			full_string[read_string] = (char) ((int) full_string[read_string] + 32);
 
 		arr[arr_index][curr_sub_word_index] = full_string[read_string];
