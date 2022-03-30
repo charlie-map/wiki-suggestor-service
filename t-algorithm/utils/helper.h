@@ -10,6 +10,9 @@ void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_siz
 /* DESTROY HASHMAP FLOAT */
 void destroy_hashmap_float(void *v);
 
+/* FIND AND REPLACE */
+char *find_and_replace(char *original, char *match, char *replacer);
+
 /* SPLIT STRING FUNCTIONALITY */
 int char_is_range(char _char);
 int num_is_range(char _char);

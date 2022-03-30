@@ -321,8 +321,9 @@ void unique_recommend(req_t req, res_t res) {
 		printf("CLASS %d\n", get_mw_parser_output);
 		token_t *tag_match = grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match);
 		printf("class %d to tag %d\n", get_mw_parser_output, tag_match);
-		char *document_intro = token_read_all_data(grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match), document_intro_len, NULL, NULL);
-		
+		char *document_intro_pre = token_read_all_data(grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match), document_intro_len, NULL, NULL);
+		char *document_intro = find_and_replace(document_intro_pre, "\"", "\\\"");
+		free(document_intro_pre);
 
 		int new_len = strlen(curr_doc_vec->title) + strlen(image_url) + *document_intro_len + 32;
 
