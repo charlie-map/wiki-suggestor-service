@@ -138,6 +138,9 @@ int main() {
 	free(word_bag_len);
 	free(word_bag);
 
+	deepdestroy__hashmap(dimensions);
+
+	trie_destroy(stopword_trie);
 	mysql_close(db);
 
 	return 0;
@@ -308,8 +311,8 @@ void unique_recommend(req_t req, res_t res) {
 		db_res_destroy(db_doc);
 		// a couple of data items we can grab:
 		// first image we encounter
-		token_t *get_first_image = grab_token_by_tag(token_curr_doc_vec, "img");
-		char *image_url = token_attr(get_first_image, "src") + sizeof(char) * 2;
+		token_t *get_first_image = grab_token_by_tag_maxsearch(token_curr_doc_vec, "img", 20);
+		char *image_url = get_first_image ? token_attr(get_first_image, "src") + sizeof(char) * 2 : "";
 		// first couple blips of text within first p tag in div.mw-parser-output
 
 		token_t *get_mw_parser_output = grab_token_by_classname(token_curr_doc_vec, "mw-parser-output");
@@ -318,6 +321,7 @@ void unique_recommend(req_t req, res_t res) {
 		int *document_intro_len = malloc(sizeof(int));
 		token_t *tag_match = grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match);
 		char *document_intro_pre = token_read_all_data(grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match), document_intro_len, NULL, NULL);
+		printf("initial %s\n", document_intro_pre);
 		char *document_intro;
 		if (*document_intro_len)
 			document_intro = find_and_replace(document_intro_pre, "\"", "\\\"");
@@ -340,13 +344,20 @@ void unique_recommend(req_t req, res_t res) {
 
 		doc_titles[curr_doc_titles_len - 1] = '\0';
 
+		free(document_intro_len);
+		free(document_intro);
+                destroy_token(token_curr_doc_vec);
+
 		s_pq_node_t *next = start_doc->next;
 		free(start_doc);
+
 		start_doc = next;
 	}
 
 	doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + 1));
 	strcat(doc_titles, "]");
+
+	printf("%s\n", doc_titles);
 
 	free(full_document_vectors);
 	free(closest_doc_vector);

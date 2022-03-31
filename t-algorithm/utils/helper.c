@@ -72,7 +72,9 @@ char *find_and_replace(char *original, char *match, char *replacer) {
 		}
 	}
 
+	free(new_len);
 	free(match_checker);
+
 	return new;
 }
 

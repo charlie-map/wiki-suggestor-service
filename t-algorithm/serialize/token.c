@@ -138,10 +138,10 @@ char *data_at_token(token_t *curr_token) {
 	return curr_token->data;
 }
 
-token_t *grab_token_by_tag_helper(token_t *start_token, char *tag_name, int (*is_match)(token_t *)) {
+token_t *grab_token_by_tag_helper(token_t *start_token, char *tag_name, int (*is_match)(token_t *), int max_search) {
 	// search for first occurence of token with tag name == tag_name
 	// if it doesn't exists, return NULL
-	for (int check_children = 0; check_children < start_token->children_index; check_children++) {
+	for (int check_children = 0; check_children < start_token->children_index && (!max_search || check_children < max_search); check_children++) {
 		// compare tag:
 		if (strcmp(start_token->children[check_children]->tag, tag_name) == 0 && is_match(start_token->children[check_children]))
 			return start_token->children[check_children];
@@ -149,7 +149,7 @@ token_t *grab_token_by_tag_helper(token_t *start_token, char *tag_name, int (*is
 
 	// otherwise check children
 	for (int bfs_children = 0; bfs_children < start_token->children_index; bfs_children++) {
-		token_t *check_children_token = grab_token_by_tag_helper(start_token->children[bfs_children], tag_name, is_match);
+		token_t *check_children_token = grab_token_by_tag_helper(start_token->children[bfs_children], tag_name, is_match, max_search);
 
 		if (check_children_token)
 			return check_children_token;
@@ -163,12 +163,22 @@ int matcher_true(token_t *token) {
 }
 
 token_t *grab_token_by_tag(token_t *start_token, char *tag_name) {
-	return grab_token_by_tag_helper(start_token, tag_name, matcher_true);
+	return grab_token_by_tag_helper(start_token, tag_name, matcher_true, 0);
+}
+
+token_t *grab_token_by_tag_maxsearch(token_t *start_token, char *tag_name, int max_search) {
+	return grab_token_by_tag_helper(start_token, tag_name, matcher_true, max_search);
 }
 
 token_t *grab_token_by_tag_matchparam(token_t *start_token, char *tag_name, int (*match)(token_t *)) {
-	return grab_token_by_tag_helper(start_token, tag_name, match);
+	return grab_token_by_tag_helper(start_token, tag_name, match, 0);
 }
+
+token_t *grab_token_by_tag_matchparam_maxsearch(token_t *start_token, char *tag_name, int (*match)(token_t *), int max_search) {
+	return grab_token_by_tag_helper(start_token, tag_name, match, max_search);
+}
+
+
 
 int grab_tokens_by_tag_helper(token_t **specific_token_builder, int *spec_token_max, int spec_token_index, token_t *start_token, char *tag_name) {
 	// check current tokens children:
