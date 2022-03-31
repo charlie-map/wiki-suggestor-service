@@ -233,7 +233,7 @@ void nearest_neighbor(req_t req, res_t res) {
 }
 
 int p_tag_match(token_t *t) {
-	return !token_has_classname(t, "mw-empty-elt");
+	return token_has_classname(t, "mw-empty-elt") ? 0 : 1;
 }
 // expects user unique ID (uuid form) which connects to then selecting all documents
 // they have viewed thus far
@@ -246,7 +246,6 @@ void unique_recommend(req_t req, res_t res) {
 		return;
 	}
 
-	printf("%s\n", user_uuid);
 	db_res *db_r = db_query(db, "SELECT id, age FROM user WHERE unique_id=?", user_uuid);
 
 	if (!db_r->row_count) {
@@ -273,7 +272,6 @@ void unique_recommend(req_t req, res_t res) {
 		return;
 	}
 
-	printf("%d\n", db_r->row_count);
 	hashmap *sub_user_doc = make__hashmap(0, NULL, NULL);
 	document_vector_t **full_document_vectors = malloc(sizeof(document_vector_t *) * db_r->row_count);
 	for (int copy_document_vector = 0; copy_document_vector < db_r->row_count; copy_document_vector++) {
@@ -318,18 +316,23 @@ void unique_recommend(req_t req, res_t res) {
 		// then select p tags, (maybe look at first couple?)
 		// need a way to selectively choose if skips should occur
 		int *document_intro_len = malloc(sizeof(int));
-		printf("CLASS %d\n", get_mw_parser_output);
 		token_t *tag_match = grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match);
-		printf("class %d to tag %d\n", get_mw_parser_output, tag_match);
 		char *document_intro_pre = token_read_all_data(grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match), document_intro_len, NULL, NULL);
-		char *document_intro = find_and_replace(document_intro_pre, "\"", "\\\"");
+		char *document_intro;
+		if (*document_intro_len)
+			document_intro = find_and_replace(document_intro_pre, "\"", "\\\"");
+		else {
+			document_intro = malloc(sizeof(char) * 22);
+			strcpy(document_intro, "No description found.");
+		}
+
 		free(document_intro_pre);
 
-		int new_len = strlen(curr_doc_vec->title) + strlen(image_url) + *document_intro_len + 32;
+		int new_len = strlen(curr_doc_vec->title) + strlen(image_url) + strlen(document_intro) + 38;
 
 		doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + new_len));
 		sprintf(doc_titles + sizeof(char) * (curr_doc_titles_len - 1),
-			"{title:\"%s\",image:\"%s\",descript:\"%s\"}", ((document_vector_t *) start_doc->payload)->title, image_url, document_intro);
+			"{\"title\":\"%s\",\"image\":\"%s\",\"descript\":\"%s\"}", ((document_vector_t *) start_doc->payload)->title, image_url, document_intro);
 
 		curr_doc_titles_len += new_len;
 		if (start_doc->next)
@@ -344,8 +347,6 @@ void unique_recommend(req_t req, res_t res) {
 
 	doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + 1));
 	strcat(doc_titles, "]");
-
-	printf("%s\n", doc_titles);
 
 	free(full_document_vectors);
 	free(closest_doc_vector);

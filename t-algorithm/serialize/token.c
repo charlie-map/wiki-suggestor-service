@@ -149,7 +149,7 @@ token_t *grab_token_by_tag_helper(token_t *start_token, char *tag_name, int (*is
 
 	// otherwise check children
 	for (int bfs_children = 0; bfs_children < start_token->children_index; bfs_children++) {
-		token_t *check_children_token = grab_token_by_tag(start_token->children[bfs_children], tag_name);
+		token_t *check_children_token = grab_token_by_tag_helper(start_token->children[bfs_children], tag_name, is_match);
 
 		if (check_children_token)
 			return check_children_token;
@@ -273,13 +273,13 @@ int token_read_all_data_helper(token_t *search_token, char **full_data, int *dat
 			data_index = token_read_all_data_helper(search_token->children[add_from_child], full_data, data_max, data_index, block_tag, is_blocked,
 				block_tag && is_blocked(block_tag, search_token->children[add_from_child]->tag));
 
-			if (prev_data_index < data_index && (
-				data_index > 0 && (*full_data)[data_index - 1] != ' ')) {
+			//if (prev_data_index < data_index && (
+			//	data_index > 0 && (*full_data)[data_index - 1] != ' ')) {
 				// add extra space after token addition for ensure no touching words:
-				*full_data = resize_full_data(*full_data, data_max, data_index + 2);
-				(*full_data)[data_index] = ' ';
-				data_index++;
-			}
+			//	*full_data = resize_full_data(*full_data, data_max, data_index + 2);
+			//	(*full_data)[data_index] = ' ';
+			//	data_index++;
+			//}
 
 			// move to next child
 			add_from_child++;
@@ -332,7 +332,6 @@ int has_attr_value(char **attribute, int attr_len, char *attr, char *attr_value)
 		return 0;
 
 	attr_pos++;
-	printf("check attr: %s v. %s ", attribute[attr_pos], attr_value);
 
 	int *classlist_len = malloc(sizeof(int));
 	char **classlist = split_string(attribute[attr_pos], ' ', classlist_len, "-r", mirror);
@@ -347,8 +346,6 @@ int has_attr_value(char **attribute, int attr_len, char *attr, char *attr_value)
 
 	free(classlist);
 	free(classlist_len);
-
-	printf("%d\n", found_class);
 
 	return found_class;
 }
