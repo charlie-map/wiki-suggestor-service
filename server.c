@@ -260,6 +260,7 @@ void unique_recommend(req_t req, res_t res) {
 
 	// grab user ID
 	char *buffer_user_ID = (char *) get__hashmap(db_r->row__data[0], "id", "");
+	printf("%d\n", buffer_user_ID);
 	char *user_ID = malloc(sizeof(char) * (strlen(buffer_user_ID) + 1)); strcpy(user_ID, buffer_user_ID);
 
 	db_res_destroy(db_r);
@@ -306,6 +307,7 @@ void unique_recommend(req_t req, res_t res) {
 
 		db_res *db_doc = db_query(db, "SELECT wiki_page FROM page WHERE id=?", curr_doc_vec->id);
 
+		printf("have page %d\n", db_doc->row_count);
 		token_t *token_curr_doc_vec = tokenize('s', (char *) get__hashmap(db_doc->row__data[0], "wiki_page", ""));
 
 		db_res_destroy(db_doc);
