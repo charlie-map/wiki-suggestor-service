@@ -4,6 +4,7 @@
 
 #include "kd-tree.h"
 #include "deserialize.h"
+#include "document-vector.h"
 
 typedef struct KD_Node {
 	void *payload;
@@ -223,52 +224,129 @@ void *kdtree_min(kdtree_t *k_t, void *D) {
 	return k_node->payload;
 }
 
-/* search:
-is the square dist between current best's dimension X and this split's dimension X
-	greater or less than the overall dist between current and search term?
-----If it's greater
-	bail and do not recur
-----If it's less
-	you can determine nothing, so recur
-*/
-void *search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void *kd_payload, int depth) {
-	if (!k_node)
-		return NULL;
 
-	// look at current k_node and see which direction to go in:
-	void *node_payload = k_t->member_extract(k_node->payload, dimension);
-	void *search_payload = k_t->member_extract(kd_payload, dimension);
+int is_not_search_node(void *payload, void **payloads, int payload_len) {
+	for (int check_payload = 0; check_payload < payload_len; check_payload++)
+		if (payload == payloads[check_payload])
+			return 0;
 
-	int weight = k_t->weight(search_payload, node_payload);
-
-	// depending on weight, choose which direction to move in
-	// if 1, move left, 0, move right
-	void *curr_best = search_kdtree_helper(k_t, weight ? k_node->left : k_node->right, k_t->next_d(dimension), kd_payload, depth + 1);
-	curr_best = curr_best ? curr_best : search_kdtree_helper(k_t, weight ? k_node->right: k_node->left, k_t->next_d(dimension), kd_payload, depth + 1);
-	if (!curr_best)
-		return k_node->payload;
-
-	void *curr_best_payload = NULL;
-	if (curr_best)
-		curr_best_payload = k_t->member_extract(curr_best, dimension);
-
-	// based on return payload, make some comparisons to see what to do next:
-	// check the split payload againt the best payload in the current dimension
-
-	float curr_best_v_node_distance = k_t->distance(node_payload, curr_best_payload);
-	float curr_best_v_search_distance = k_t->distance(search_payload, curr_best_payload);
-
-	if (node_payload == search_payload)
-		return curr_best;
-
-	if (curr_best_v_node_distance > curr_best_v_search_distance && curr_best_payload != search_payload)
-		return curr_best;
-	else
-		return k_node->payload;
+	return 1;
 }
 
-void *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload) {
-	return search_kdtree_helper(k_t, k_t->kd_head, dimension, kd_payload, 0);
+int insert_pq(s_pq_t *head, void *payload) {
+	head->pq_size++;
+	// insert into head pos:
+	s_pq_node_t *min = head->min;
+
+	if (!min) {
+		head->min = malloc(sizeof(s_pq_node_t));
+		head->min->payload = payload;
+		head->min->next = NULL;
+		return 0;
+	}
+
+	s_pq_node_t *new_pq_node = malloc(sizeof(s_pq_node_t));
+	new_pq_node->payload = payload;
+	new_pq_node->next = min;
+
+	head->min = new_pq_node;
+
+	return 0;
+}
+
+s_pq_node_t *skip(s_pq_t *head, int skip_amount) {
+	s_pq_node_t *curr = head->min;
+
+	for (int read_skip = 0; read_skip < skip_amount && curr; read_skip++) {
+		curr = curr->next;
+	}
+
+	return curr;
+}
+
+int node_curr_greater(float *node_curr_values, float *meta_curr_values, int value_len) {
+	for (int node_check_curr_values = 0; node_check_curr_values < value_len; node_check_curr_values++) {
+		if (node_curr_values[node_check_curr_values] < meta_curr_values[node_check_curr_values])
+			return node_check_curr_values;
+	}
+
+	return -1;
+}
+/* search:
+	searches through kdtree_t *k_t to find closest related documents based on kd_payload (the search term)
+	-- k_node: the current document vector we are standing at within k_t
+	-- dimension: the current dimension based on the level within k_t
+	-- max_document_returns: the maximum documents to return from the search
+
+	returns a linked list of documents that were most related to kd_payload
+*/
+int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void *search_payload, s_pq_t *curr_s_ll, int max_document_returns, void **current_payloads, int number_of_payloads) {
+	if (curr_s_ll->pq_size == max_document_returns)
+		return 0;
+
+	if (!k_node->right && !k_node->left) {
+		if (is_not_search_node(k_node->payload, current_payloads, max_document_returns))
+			insert_pq(curr_s_ll, k_node->payload);
+
+		return 0;
+	} else if (!k_node->right) {
+		if (is_not_search_node(k_node->right->payload, current_payloads, max_document_returns))
+			insert_pq(curr_s_ll, k_node->right->payload);
+
+		return 0;
+	} else if (!k_node->left) {
+		if (is_not_search_node(k_node->left->payload, current_payloads, max_document_returns))
+			insert_pq(curr_s_ll, k_node->left->payload);
+
+		return 0;
+	}
+
+	// look at current k_node and see which direction to go in:
+	void *node_termfreq = k_t->member_extract(k_node->payload, dimension);
+	void *search_termfreq = k_t->member_extract(search_payload, dimension);
+
+	int weight = k_t->weight(search_termfreq, node_termfreq);
+
+	search_kdtree_helper(k_t, weight ? k_node->right : k_node->left, k_t->next_d(dimension), search_payload, curr_s_ll, max_document_returns, current_payloads, number_of_payloads);
+
+	// if pq isn't full, add k_node anyways
+	if (curr_s_ll->pq_size < max_document_returns) {
+		return insert_pq(curr_s_ll, k_node->payload);
+	}
+
+	float *meta_curr_document_distances = malloc(sizeof(float) * max_document_returns);
+	float *node_curr_document_distance = malloc(sizeof(float) * max_document_returns);
+	int read_curr_doc;
+	for (read_curr_doc = 0; skip(curr_s_ll, read_curr_doc); read_curr_doc++) {
+		meta_curr_document_distances[read_curr_doc] = k_t->meta_distance(skip(curr_s_ll, read_curr_doc)->payload, search_payload);
+		node_curr_document_distance[read_curr_doc] = k_t->distance(k_t->member_extract(skip(curr_s_ll, read_curr_doc)->payload, dimension), k_t->member_extract(k_node->payload, dimension));
+	}
+
+	int worst_pos;
+	if ((worst_pos = node_curr_greater(node_curr_document_distance, meta_curr_document_distances, read_curr_doc)) == -1) {
+		free(meta_curr_document_distances);
+		free(node_curr_document_distance);
+
+		return 0;
+	}
+
+	// otherwise see which one should be swapped out for the value at this position
+	skip(curr_s_ll, worst_pos)->payload = k_node->payload;
+
+	free(meta_curr_document_distances);
+	free(node_curr_document_distance);
+	return 0;
+}
+
+s_pq_t *kdtree_search(kdtree_t *k_t, void *dimension, void *kd_payload, int max_document_returns, void **current_payloads, int number_of_payloads) {
+	s_pq_t *head_node = malloc(sizeof(s_pq_t));
+
+	head_node->min = NULL;
+	head_node->pq_size = 0;
+
+	search_kdtree_helper(k_t, k_t->kd_head, dimension, kd_payload, head_node, max_document_returns, current_payloads, number_of_payloads);
+
+	return head_node;
 }
 
 // DFS for node

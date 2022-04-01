@@ -29,9 +29,9 @@ int deserialize_title(char *title_reader, hashmap *doc_map, char ***ID, int *ID_
 
 	int line_buffer_length = 0;
 	while ((line_buffer_length = getline(&line_buffer, &line_buffer_size, index)) != -1) {
-		char **split_row = split_string(line_buffer, 0, row_num, "-d-r", delimeter_check, ": ", num_is_range);
+		char **split_row = split_string(line_buffer, 0, row_num, "-d-r-c", delimeter_check, ": ", mirror);
 
-		int title_length = line_buffer_length - (strlen(split_row[0]) + strlen(split_row[*row_num - 1]) + 2);
+		int title_length = line_buffer_length - (strlen(split_row[0]) + strlen(split_row[*row_num - 1]));
 		// now pull out the different components into a hashmap value:
 		(*ID)[ID_index] = split_row[0];
 
@@ -145,11 +145,16 @@ char **deserialize(char *index_reader, hashmap *term_freq, hashmap *docs, int *m
 			float term_frequency = atof(line_subs[read_doc_freq + 1]);
 			free(line_subs[read_doc_freq + 1]);
 
+			tf->tfs += term_frequency;
+			tf->tfs_sq += term_frequency * term_frequency;
+
 			float *normal_term_freq = malloc(sizeof(float));
 			*normal_term_freq = term_frequency / doc_freq;
 
 			insert__hashmap(doc->map, words[words_index], normal_term_freq, "", compareCharKey, NULL);
 		}
+
+		tf->standard_deviation = sqrt(tf->tfs_sq);
 
 		words_index++;
 		words = resize_array(words, max_words, words_index, sizeof(char *));

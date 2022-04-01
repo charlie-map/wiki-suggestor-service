@@ -35,6 +35,10 @@ tf_t *new_tf_t(char *ID) {
 	new_tf->curr_doc_id = ID;
 	new_tf->curr_term_freq = 1;
 
+	new_tf->tfs = 0;
+	new_tf->tfs_sq = 0;
+
+	new_tf->standard_deviation = 0;
 	new_tf->doc_freq = 1;
 
 	return new_tf;
@@ -58,7 +62,7 @@ int is_m(void *tf, void *extra) {
 	Now index_fp, title_fp, and idf_hash need mutex locking,
 	so bring mutex attr with them
 */
-int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
+int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 	token_t *full_page, char **ID, document_vector_t *opt_doc) {
 	int total_bag_size = 0;
 
@@ -145,10 +149,15 @@ int word_bag(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 						*opt_map_value++;
 				}
 			} else { // reset features
+				hashmap_freq->tfs += hashmap_freq->curr_term_freq;
+				hashmap_freq->tfs_sq += hashmap_freq->curr_term_freq * hashmap_freq->curr_term_freq;
+
 				hashmap_freq->curr_term_freq = 1;
 				hashmap_freq->curr_doc_id = *ID;
 
 				hashmap_freq->doc_freq++;
+
+				hashmap_freq->standard_deviation = sqrt(hashmap_freq->tfs_sq);
 
 				// setup document_vector_t if there
 				if (opt_doc) {

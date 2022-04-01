@@ -1,8 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 
 #include "helper.h"
+
+int mirror(int t, ...) {
+	return 1;
+}
 
 void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_size) {
 	while (curr_index >= *max_len) {
@@ -12,6 +17,65 @@ void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_siz
 	}
 	
 	return arr;
+}
+
+// searches through original looking for a match and then replaces
+char *find_and_replace(char *original, char *match, char *replacer) {
+	int *new_len = malloc(sizeof(int)), index_new = 0; *new_len = 8;
+	char *new = malloc(sizeof(char) * *new_len);
+
+	int match_len = strlen(match), replacer_len = strlen(replacer);
+	int index_match_check = 0;
+	char *match_checker = malloc(sizeof(char) * match_len);
+	memset(match_checker, '\0', sizeof(char) * match_len);
+	// start searching original for matches
+
+	for (int read_org = 0; original[read_org]; read_org++) {
+		// if character equals match
+		if (original[read_org] == match[index_match_check]) {
+			// add to current match_checker and index_match_check
+			match_checker[index_match_check] = original[read_org];
+
+			index_match_check++;
+
+			// if match_checker is fully filled, strcat replacer onto new and reset match_checker
+			if (index_match_check == match_len) {
+				new = resize_array(new, new_len, index_new + replacer_len + 1, sizeof(char));
+
+				strcat(new, replacer);
+				index_new += replacer_len;
+
+				index_match_check = 0;
+			}
+
+			continue;
+		} else {
+			// add to original, but make sure index_match_check is 0
+			if (!index_match_check) {
+				// normal add
+				new[index_new] = original[read_org];
+
+				index_new++;
+				new = resize_array(new, new_len, index_new, sizeof(char));
+
+				new[index_new] = '\0';
+			} else {
+				// strcat into new
+				new = resize_array(new, new_len, index_new + index_match_check + 1, sizeof(char));
+
+				strcat(new, match_checker);
+
+				index_new += index_match_check - 1;
+
+				index_match_check = 0;
+			}
+		}
+	}
+
+	free(new_len);
+	free(match_checker);
+
+	return new;
 }
 
 // create index structure
@@ -50,6 +114,9 @@ int delimeter_check(char curr_char, char *delims) {
 		checks for range: default is (with chars) first one:
 				number range as well is second one:
 		use: "-r" to access range functions
+	should_lowercase:
+		used for deciding if a value should be lowercased
+		use: "-c" to turn this to false (defaults to true)
 */
 	int char_is_range(char _char) {
 		return (((int) _char >= 65 && (int) _char <= 90) || ((int) _char >= 97 && (int) _char <= 122));
@@ -72,6 +139,8 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 
 	int (*is_range)(char _char) = char_is_range;
 
+	int should_lowercase = 1;
+
 	for (int check_extra = 0; extra[check_extra]; check_extra++) {
 		if (extra[check_extra] != '-')
 			continue;
@@ -83,7 +152,8 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 			multi_delims = va_arg(param, char *);
 		} else if (extra[check_extra + 1] == 'r') {
 			is_range = va_arg(param, int (*)(char));
-		}
+		} else if (extra[check_extra + 1] == 'c')
+			should_lowercase = 0;
 	}
 
 	int arr_index = 0;
@@ -132,7 +202,7 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 			continue;
 
 		// if a capital letter, lowercase
-		if ((int) full_string[read_string] <= 90 && (int) full_string[read_string] >= 65)
+		if (should_lowercase && (int) full_string[read_string] <= 90 && (int) full_string[read_string] >= 65)
 			full_string[read_string] = (char) ((int) full_string[read_string] + 32);
 
 		arr[arr_index][curr_sub_word_index] = full_string[read_string];

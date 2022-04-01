@@ -257,10 +257,10 @@ void *data_read(void *meta_ptr) {
 
 		// printf("CHECK: %s\n", res_body(wiki_page));
 		// parse the wiki data and write to the bag of words
-		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page), array_body[read_body]);
+		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page));
 
 		pthread_mutex_lock(&(ser_pt->term_freq->mutex));
-		int new_doc_length = word_bag(ser_pt->term_freq->runner, ser_pt->title_writer, stopword_trie, new_wiki_page_token, &all_IDs[read_body], NULL);
+		int new_doc_length = token_to_terms(ser_pt->term_freq->runner, ser_pt->title_writer, stopword_trie, new_wiki_page_token, &all_IDs[read_body], NULL);
 		
 		if (new_doc_length < 0) {
 			printf("\nWRITE ERR\n");

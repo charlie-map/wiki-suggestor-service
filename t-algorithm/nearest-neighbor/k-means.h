@@ -25,6 +25,8 @@ void destroy_cluster_centroid_data(void *ccd);
 
 int destroy_cluster(cluster_t **cluster, int k);
 
+float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, float centroid_sqrt_mag);
+
 cluster_t **k_means(hashmap *doc, int k, int cluster_threshold);
 cluster_t *find_closest_cluster(cluster_t **cluster, int k, document_vector_t *doc);
 

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "token.h"
+#include "../utils/helper.h"
 
 void *resize_arraylist(void *array, int *max_size, int current_index, size_t singleton_size) {
 	while (current_index >= *max_size) {
@@ -91,6 +92,17 @@ int add_token_attribute(token_t *token, char *tag, char *attribute) {
 	return 0;
 }
 
+char *token_attr(token_t *token, char *attr) {
+	// search for attr
+	int read_attr;
+	for (read_attr = 0; read_attr < token->attr_tag_index; read_attr++) {
+		if (strcmp(token->attribute[read_attr], attr) == 0)
+			return token->attribute[read_attr + 1];
+	}
+
+	return NULL;
+}
+
 int add_token_children(token_t *token_parent, token_t *child) {
 	token_parent->children[token_parent->children_index] = child;
 
@@ -126,18 +138,18 @@ char *data_at_token(token_t *curr_token) {
 	return curr_token->data;
 }
 
-token_t *grab_token_by_tag(token_t *start_token, char *tag_name) {
+token_t *grab_token_by_tag_helper(token_t *start_token, char *tag_name, int (*is_match)(token_t *), int max_search) {
 	// search for first occurence of token with tag name == tag_name
 	// if it doesn't exists, return NULL
-	for (int check_children = 0; check_children < start_token->children_index; check_children++) {
+	for (int check_children = 0; check_children < start_token->children_index && (!max_search || check_children < max_search); check_children++) {
 		// compare tag:
-		if (strcmp(start_token->children[check_children]->tag, tag_name) == 0)
+		if (strcmp(start_token->children[check_children]->tag, tag_name) == 0 && is_match(start_token->children[check_children]))
 			return start_token->children[check_children];
 	}
 
 	// otherwise check children
 	for (int bfs_children = 0; bfs_children < start_token->children_index; bfs_children++) {
-		token_t *check_children_token = grab_token_by_tag(start_token->children[bfs_children], tag_name);
+		token_t *check_children_token = grab_token_by_tag_helper(start_token->children[bfs_children], tag_name, is_match, max_search);
 
 		if (check_children_token)
 			return check_children_token;
@@ -145,6 +157,28 @@ token_t *grab_token_by_tag(token_t *start_token, char *tag_name) {
 
 	return NULL;
 }
+
+int matcher_true(token_t *token) {
+	return 1;
+}
+
+token_t *grab_token_by_tag(token_t *start_token, char *tag_name) {
+	return grab_token_by_tag_helper(start_token, tag_name, matcher_true, 0);
+}
+
+token_t *grab_token_by_tag_maxsearch(token_t *start_token, char *tag_name, int max_search) {
+	return grab_token_by_tag_helper(start_token, tag_name, matcher_true, max_search);
+}
+
+token_t *grab_token_by_tag_matchparam(token_t *start_token, char *tag_name, int (*match)(token_t *)) {
+	return grab_token_by_tag_helper(start_token, tag_name, match, 0);
+}
+
+token_t *grab_token_by_tag_matchparam_maxsearch(token_t *start_token, char *tag_name, int (*match)(token_t *), int max_search) {
+	return grab_token_by_tag_helper(start_token, tag_name, match, max_search);
+}
+
+
 
 int grab_tokens_by_tag_helper(token_t **specific_token_builder, int *spec_token_max, int spec_token_index, token_t *start_token, char *tag_name) {
 	// check current tokens children:
@@ -249,13 +283,13 @@ int token_read_all_data_helper(token_t *search_token, char **full_data, int *dat
 			data_index = token_read_all_data_helper(search_token->children[add_from_child], full_data, data_max, data_index, block_tag, is_blocked,
 				block_tag && is_blocked(block_tag, search_token->children[add_from_child]->tag));
 
-			if (prev_data_index < data_index && (
-				data_index > 0 && (*full_data)[data_index - 1] != ' ')) {
+			//if (prev_data_index < data_index && (
+			//	data_index > 0 && (*full_data)[data_index - 1] != ' ')) {
 				// add extra space after token addition for ensure no touching words:
-				*full_data = resize_full_data(*full_data, data_max, data_index + 2);
-				(*full_data)[data_index] = ' ';
-				data_index++;
-			}
+			//	*full_data = resize_full_data(*full_data, data_max, data_index + 2);
+			//	(*full_data)[data_index] = ' ';
+			//	data_index++;
+			//}
 
 			// move to next child
 			add_from_child++;
@@ -295,6 +329,61 @@ char *token_read_all_data(token_t *search_token, int *data_max, void *block_tag,
 	char *pull_data = *full_data;
 	free(full_data);
 	return pull_data;
+}
+
+int has_attr_value(char **attribute, int attr_len, char *attr, char *attr_value) {
+	int attr_pos;
+	for (attr_pos = 0; attr_pos < attr_len; attr_pos += 2) {
+		if (strcmp(attribute[attr_pos], attr) == 0)
+			break;
+	}
+
+	if (attr_pos == attr_len)
+		return 0;
+
+	attr_pos++;
+
+	int *classlist_len = malloc(sizeof(int));
+	char **classlist = split_string(attribute[attr_pos], ' ', classlist_len, "-r", mirror);
+
+	int found_class = 0;
+	for (int check_classlist = 0; check_classlist < *classlist_len; check_classlist++) {
+		if (strcmp(classlist[check_classlist], attr_value) == 0)
+			found_class = 1;
+
+		free(classlist[check_classlist]);
+	}
+
+	free(classlist);
+	free(classlist_len);
+
+	return found_class;
+}
+
+int token_has_classname(token_t *token, char *classname) {
+	return has_attr_value(token->attribute, token->attr_tag_index, "class", classname);
+}
+
+// takes current search token and searches for the attribute `class=classname`
+// will return first occurrence of a token that has that classname
+token_t *grab_token_by_classname(token_t *start_token, char *classname) {
+	// if it doesn't exists, return NULL
+	for (int check_children = 0; check_children < start_token->children_index; check_children++) {
+		// compare tag:
+		if (has_attr_value(start_token->children[check_children]->attribute,
+			start_token->children[check_children]->attr_tag_index, "class", classname))
+			return start_token->children[check_children];
+	}
+
+	// otherwise check children
+	for (int bfs_children = 0; bfs_children < start_token->children_index; bfs_children++) {
+		token_t *check_children_token = grab_token_by_classname(start_token->children[bfs_children], classname);
+
+		if (check_children_token)
+			return check_children_token;
+	}
+
+	return NULL;
 }
 
 int read_main_tag(char **main_tag, char *curr_line, int search_tag) {
@@ -556,7 +645,7 @@ tag_reader read_tag(token_t *parent_tree, FILE *file, char *str_read, char **cur
 	return tag_read;
 }
 
-int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree, char *ID) {
+int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree) {
 	int search_token = 0;
 
 	size_t *buffer_size = malloc(sizeof(size_t));
@@ -622,7 +711,7 @@ int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree, char *ID) {
 	'f' for file reading
 	's' for char * reading
 */
-token_t *tokenize(char reader_type, char *filename, char *ID) {
+token_t *tokenize(char reader_type, char *filename) {
 	FILE *file = NULL;
 
 	if (reader_type == 'f')
@@ -632,7 +721,7 @@ token_t *tokenize(char reader_type, char *filename, char *ID) {
 	strcpy(root_tag, "root");
 	token_t *curr_tree = create_token(root_tag, NULL);
 
-	tokenizeMETA(file, filename, curr_tree, ID);
+	tokenizeMETA(file, filename, curr_tree);
 
 	if (file)
 		fclose(file);
