@@ -54,6 +54,7 @@ struct KD_Tree {
 	// within members
 	void *(*member_extract)(void *, void *);
 
+	void *dimensions; // holds all possible dimensions (specific use cases)
 	// the array of all the possible dimension, eg.:
 	// [x, y] (could be represented as [0, 1] to access another array)
 	// [R, G, B]
@@ -61,7 +62,7 @@ struct KD_Tree {
 	// will pull whatever dimension occurs next
 	// for a linked list, would be the next pointer
 	// make sure it reaches a NULL
-	void *(*next_d)(void *);
+	void *(*next_d)(void *, void *);
 
 	float (*distance)(void *, void *);
 	float (*meta_distance)(void *, void *);
@@ -69,13 +70,15 @@ struct KD_Tree {
 	kd_node_t *kd_head;
 };
 
-kdtree_t *kdtree_create(int (*weight)(void *, void *), void *(*member_extract)(void *, void *), void *dimension, void *(*next_d)(void *), float (*distance)(void *, void *), float (*meta_distance)(void *, void *)) {
+kdtree_t *kdtree_create(int (*weight)(void *, void *), void *(*member_extract)(void *, void *), void *dimensions, void *dimension, void *(*next_d)(void *, void *), float (*distance)(void *, void *), float (*meta_distance)(void *, void *)) {
 	kdtree_t *new_kd = malloc(sizeof(kdtree_t));
 
 	new_kd->weight = weight;
 
 	new_kd->member_extract = member_extract;
 	new_kd->next_d = next_d;
+
+	new_kd->dimensions = dimensions;
 	new_kd->dimension = dimension;
 
 	new_kd->distance = distance;
@@ -137,7 +140,7 @@ int quicksort(kdtree_t *k_t, kd_node_t *k_node, void ***members, void *dimension
 	k_node->left = low < pivot ? node_construct(k_node, NULL) : NULL;
 	k_node->right = pivot < high ? node_construct(k_node, NULL) : NULL;
 
-	dimension = k_t->next_d(dimension);
+	dimension = k_t->next_d(k_t->dimensions, dimension);
 	dimension = dimension ? dimension : k_t->dimension; // nice
 
 	// left
@@ -175,7 +178,7 @@ void *kdtree_insert_helper(kdtree_t *k_t, kd_node_t *k_node, void *payload, void
 		return k_node->right;
 	}
 
-	return kdtree_insert_helper(k_t, path ? k_node->right : k_node->left, payload, k_t->next_d(dimension));
+	return kdtree_insert_helper(k_t, path ? k_node->right : k_node->left, payload, k_t->next_d(k_t->dimensions, dimension));
 }
 
 void *kdtree_insert(kdtree_t *k_t, void *payload) {
@@ -194,14 +197,14 @@ kd_node_t *kdtree_min_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, 
 		return NULL;
 
 	// get left small (need either way)
-	kd_node_t *left_small = kdtree_min_helper(k_t, k_node->left, k_t->next_d(dimension), D);
+	kd_node_t *left_small = kdtree_min_helper(k_t, k_node->left, k_t->next_d(k_t->dimensions, dimension), D);
 
 	if (dimension == D) // pointer comparison
 		// only search on left side:
 		return left_small;
 
 	// otherwise get right_small and compare
-	kd_node_t *right_small = kdtree_min_helper(k_t, k_node->right, k_t->next_d(dimension), D);
+	kd_node_t *right_small = kdtree_min_helper(k_t, k_node->right, k_t->next_d(k_t->dimensions, dimension), D);
 
 	// compare each side in the current dimension to choose smallest
 	int size = left_small && right_small ?
@@ -307,7 +310,7 @@ int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void
 
 	int weight = k_t->weight(search_termfreq, node_termfreq);
 
-	search_kdtree_helper(k_t, weight ? k_node->right : k_node->left, k_t->next_d(dimension), search_payload, curr_s_ll, max_document_returns, current_payloads, number_of_payloads);
+	search_kdtree_helper(k_t, weight ? k_node->right : k_node->left, k_t->next_d(k_t->dimensions, dimension), search_payload, curr_s_ll, max_document_returns, current_payloads, number_of_payloads);
 
 	// if pq isn't full, add k_node anyways
 	if (curr_s_ll->pq_size < max_document_returns) {
@@ -361,8 +364,8 @@ void *node_find(kdtree_t *k_t, kd_node_t *curr_node, kd_node_t **node_finder, vo
 		return dimension;
 	}
 
-	void *l_d = node_find(k_t, curr_node->left, node_finder, load, k_t->next_d(dimension));
-	void *r_d = node_find(k_t, curr_node->right, node_finder, load, k_t->next_d(dimension));
+	void *l_d = node_find(k_t, curr_node->left, node_finder, load, k_t->next_d(k_t->dimensions, dimension));
+	void *r_d = node_find(k_t, curr_node->right, node_finder, load, k_t->next_d(k_t->dimensions, dimension));
 
 	return l_d ? l_d : r_d;
 }

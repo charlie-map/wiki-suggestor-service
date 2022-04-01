@@ -48,10 +48,9 @@ int weight(void *map1_val, void *map2_val);
 float distance(void *map1_val, void *map2_val);
 float meta_distance(void *map1_body, void *map2_body);
 void *member_extract(void *map, void *dimension);
-void *next_dimension(void *curr_dimension);
+void *next_dimension(void *dimensions, void *curr_dimension);
 
-hashmap *dimensions;
-char **build_dimensions(void *curr_vector_group, char vector_type);
+hashmap *build_dimensions(char ***dimension_groups, void *curr_vector_group, char vector_type);
 
 void nearest_neighbor(req_t req, res_t res);
 void unique_recommend(req_t req, res_t res);
@@ -78,9 +77,10 @@ int main() {
 	word_bag_len = malloc(sizeof(int));
 	char **word_bag = deserialize("docbags.txt", term_freq_map, doc_map, word_bag_len);
 
-	doc_vector_kdtree_dimensions = build_dimensions(term_freq_map, 'd');
+	hashmap *dimensions = build_dimensions(&doc_vector_kdtree_dimensions, term_freq_map, 'd');
 	doc_vector_kdtree_start_dimension = doc_vector_kdtree_dimensions[0];
-	kdtree_t *doc_vector_kdtree = kdtree_create(weight, member_extract, doc_vector_kdtree_dimensions, next_dimension, distance, meta_distance);
+	kdtree_t *doc_vector_kdtree = kdtree_create(weight, member_extract, dimensions,
+		doc_vector_kdtree_dimensions, next_dimension, distance, meta_distance);
 	mutex_doc_vector_kdtree = malloc(sizeof(mutex_t));
 	*mutex_doc_vector_kdtree = newMutexLocker(doc_vector_kdtree);
 
@@ -193,7 +193,8 @@ void nearest_neighbor(req_t req, res_t res) {
 
 	cluster_t *closest_cluster = find_closest_cluster(cluster, K, curr_doc);
 
-	char **dimension_charset = build_dimensions(closest_cluster, 'c');
+	char **dimension_charset;
+	hashmap *closest_cluster_dimensions = build_dimensions(&dimension_charset, closest_cluster, 'c');
 	char *d_1 = dimension_charset[0];
 
 	// build array of documents within the closest cluster:
@@ -202,7 +203,7 @@ void nearest_neighbor(req_t req, res_t res) {
 		cluster_docs[pull_cluster_doc] = (document_vector_t *) get__hashmap(doc_map, closest_cluster->doc_pos[pull_cluster_doc], "");
 	}
 
-	kdtree_t *cluster_rep = kdtree_create(weight, member_extract, d_1, next_dimension, distance, meta_distance);
+	kdtree_t *cluster_rep = kdtree_create(weight, member_extract, closest_cluster_dimensions, d_1, next_dimension, distance, meta_distance);
 
 	// load k-d tree
 	kdtree_load(cluster_rep, (void ***) cluster_docs, closest_cluster->doc_pos_index);
@@ -392,34 +393,34 @@ hashmap *build_dimension_map(void *curr_vector_group, char vector_type) {
 // vector type:
 // 'c' for cluster_ts
 // 'd' for document_vectors
-char **build_dimensions(void *curr_vector_group, char vector_type) {
+hashmap *build_dimensions(char ***dimension_groups, void *curr_vector_group, char vector_type) {
 	float cluster_size = build_dimension_length(curr_vector_group, vector_type);
 	hashmap *dimension_map = build_dimension_map(curr_vector_group, vector_type);
 
 	int *key_length = malloc(sizeof(int));
-	char **keys = (char **) keys__hashmap(dimension_map, key_length, "");
+	*dimension_groups = (char **) keys__hashmap(dimension_map, key_length, "");
 
 	for (int read_best = 0; read_best < cluster_size; read_best++) {
 		int best_stddev_pos = read_best;
 		float best_stddev; int best_doc_freq;
 
 		if (vector_type == 'c') {
-			best_stddev = ((cluster_centroid_data *) get__hashmap(dimension_map, keys[best_stddev_pos], ""))->standard_deviation;
-			best_doc_freq = ((cluster_centroid_data *) get__hashmap(dimension_map, keys[best_stddev_pos], ""))->doc_freq;
+			best_stddev = ((cluster_centroid_data *) get__hashmap(dimension_map, (*dimension_groups)[best_stddev_pos], ""))->standard_deviation;
+			best_doc_freq = ((cluster_centroid_data *) get__hashmap(dimension_map, (*dimension_groups)[best_stddev_pos], ""))->doc_freq;
 		} else {
-			best_stddev = ((tf_t *) get__hashmap(dimension_map, keys[best_stddev_pos], ""))->standard_deviation;
-			best_doc_freq = ((tf_t *) get__hashmap(dimension_map, keys[best_stddev_pos], ""))->doc_freq;
+			best_stddev = ((tf_t *) get__hashmap(dimension_map, (*dimension_groups)[best_stddev_pos], ""))->standard_deviation;
+			best_doc_freq = ((tf_t *) get__hashmap(dimension_map, (*dimension_groups)[best_stddev_pos], ""))->doc_freq;
 		}
 
 		for (int find_best_key = read_best + 1; find_best_key < *key_length; find_best_key++) {
 			float test_stddev; int test_doc_freq;
 
 			if (vector_type == 'c') {
-				test_stddev = ((cluster_centroid_data *) get__hashmap(dimension_map, keys[find_best_key], ""))->standard_deviation;
-				test_doc_freq = ((cluster_centroid_data *) get__hashmap(dimension_map, keys[find_best_key], ""))->doc_freq;
+				test_stddev = ((cluster_centroid_data *) get__hashmap(dimension_map, (*dimension_groups)[find_best_key], ""))->standard_deviation;
+				test_doc_freq = ((cluster_centroid_data *) get__hashmap(dimension_map, (*dimension_groups)[find_best_key], ""))->doc_freq;
 			} else {
-				test_stddev = ((tf_t *) get__hashmap(dimension_map, keys[find_best_key], ""))->standard_deviation;
-				test_doc_freq = ((tf_t *) get__hashmap(dimension_map, keys[find_best_key], ""))->doc_freq;
+				test_stddev = ((tf_t *) get__hashmap(dimension_map, (*dimension_groups)[find_best_key], ""))->standard_deviation;
+				test_doc_freq = ((tf_t *) get__hashmap(dimension_map, (*dimension_groups)[find_best_key], ""))->doc_freq;
 			}
 
 			// if test_stddev is greater than best_stddev, update best_stddev_pos and best_stddev
@@ -432,22 +433,22 @@ char **build_dimensions(void *curr_vector_group, char vector_type) {
 		}
 
 		// swap best_stddev_pos and read_best char * values
-		char *key_buffer = keys[read_best];
-		keys[read_best] = keys[best_stddev_pos];
-		keys[best_stddev_pos] = key_buffer;
+		char *key_buffer = (*dimension_groups)[read_best];
+		(*dimension_groups)[read_best] = (*dimension_groups)[best_stddev_pos];
+		(*dimension_groups)[best_stddev_pos] = key_buffer;
 	}
 
 	// then build a hashmap that points from one char * to the next, circularly linked
-	dimensions = make__hashmap(0, NULL, NULL);
+	hashmap *dimensions = make__hashmap(0, NULL, NULL);
 
 	for (int insert_word = 0; insert_word < *key_length - 1; insert_word++) {
-		insert__hashmap(dimensions, keys[insert_word], keys[insert_word + 1], "", compareCharKey, NULL);
+		insert__hashmap(dimensions, (*dimension_groups)[insert_word], (*dimension_groups)[insert_word + 1], "", compareCharKey, NULL);
 	}
 
-	insert__hashmap(dimensions, keys[*key_length - 1], keys[0], "", compareCharKey, NULL);
+	insert__hashmap(dimensions, (*dimension_groups)[*key_length - 1], (*dimension_groups)[0], "", compareCharKey, NULL);
 
 	free(key_length);
-	return keys;
+	return dimensions;
 }
 
 int weight(void *map1_val, void *map2_val) {
@@ -481,7 +482,7 @@ void *member_extract(void *map_body, void *dimension) {
 	return get__hashmap(((document_vector_t *) map_body)->map, (char *) dimension, "");
 }
 
-void *next_dimension(void *curr_dimension) {
+void *next_dimension(void *dimensions, void *curr_dimension) {
 	// curr dimension is a char * that searches into a hashmap for the next value
 	// this hashmap has each char * pointing to the next, which allows for the
 	// dimensions to be based on an initial weighting from the cluster centroid

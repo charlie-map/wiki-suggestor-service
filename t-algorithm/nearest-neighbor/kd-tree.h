@@ -3,7 +3,7 @@
 
 typedef struct KD_Tree kdtree_t;
 
-kdtree_t *kdtree_create(int (*weight)(void *, void *), void *(*member_extract)(void *, void *), void *dimension, void *(*next_d)(void *), float (*distance)(void *, void *), float (*meta_distance)(void *, void *));
+kdtree_t *kdtree_create(int (*weight)(void *, void *), void *(*member_extract)(void *, void *), void *dimensions, void *dimension, void *(*next_d)(void *, void *), float (*distance)(void *, void *), float (*meta_distance)(void *, void *));
 
 int kdtree_load(kdtree_t *k_t, void ***members, int member_length);
 void *kdtree_insert(kdtree_t *k_t, void *payload);
