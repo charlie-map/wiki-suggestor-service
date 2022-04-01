@@ -260,7 +260,6 @@ void unique_recommend(req_t req, res_t res) {
 
 	// grab user ID
 	char *buffer_user_ID = (char *) get__hashmap(db_r->row__data[0], "id", "");
-	printf("%d\n", buffer_user_ID);
 	char *user_ID = malloc(sizeof(char) * (strlen(buffer_user_ID) + 1)); strcpy(user_ID, buffer_user_ID);
 
 	db_res_destroy(db_r);
@@ -307,7 +306,6 @@ void unique_recommend(req_t req, res_t res) {
 
 		db_res *db_doc = db_query(db, "SELECT wiki_page FROM page WHERE id=?", curr_doc_vec->id);
 
-		printf("have page %d\n", db_doc->row_count);
 		token_t *token_curr_doc_vec = tokenize('s', (char *) get__hashmap(db_doc->row__data[0], "wiki_page", ""));
 
 		db_res_destroy(db_doc);
@@ -323,11 +321,16 @@ void unique_recommend(req_t req, res_t res) {
 		int *document_intro_len = malloc(sizeof(int));
 		token_t *tag_match = grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match);
 		char *document_intro_pre = token_read_all_data(grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match), document_intro_len, NULL, NULL);
-		printf("initial %s\n", document_intro_pre);
 		char *document_intro;
-		if (*document_intro_len)
-			document_intro = find_and_replace(document_intro_pre, "\"", "\\\"");
-		else {
+		if (*document_intro_len) {
+			char *document_intro_fix_quote = find_and_replace(document_intro_pre, "\"", "\\\"");
+			char *document_intro_fix_space = find_and_replace(document_intro_fix_quote, "&nbsp;", " ");
+			free(document_intro_fix_quote);
+			char *en_dash = malloc(sizeof(char) * 2);
+			sprintf(en_dash, "%c", 150);
+			document_intro = find_and_replace(document_intro_fix_space, en_dash, "-");
+			free(document_intro_fix_space);
+		} else {
 			document_intro = malloc(sizeof(char) * 22);
 			strcpy(document_intro, "No description found.");
 		}
@@ -337,8 +340,9 @@ void unique_recommend(req_t req, res_t res) {
 		int new_len = strlen(curr_doc_vec->title) + strlen(image_url) + strlen(document_intro) + 38;
 
 		doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + new_len));
+		char *remove_amp_title = find_and_replace(((document_vector_t *) start_doc->payload)->title, "&amp;", "&");
 		sprintf(doc_titles + sizeof(char) * (curr_doc_titles_len - 1),
-			"{\"title\":\"%s\",\"image\":\"%s\",\"descript\":\"%s\"}", ((document_vector_t *) start_doc->payload)->title, image_url, document_intro);
+			"{\"title\":\"%s\",\"image\":\"%s\",\"descript\":\"%s\"}", remove_amp_title, image_url, document_intro);
 
 		curr_doc_titles_len += new_len;
 		if (start_doc->next)
@@ -358,8 +362,6 @@ void unique_recommend(req_t req, res_t res) {
 
 	doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + 1));
 	strcat(doc_titles, "]");
-
-	printf("%s\n", doc_titles);
 
 	free(full_document_vectors);
 	free(closest_doc_vector);
