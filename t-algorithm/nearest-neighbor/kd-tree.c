@@ -267,6 +267,20 @@ s_pq_node_t *skip(s_pq_t *head, int skip_amount) {
 	return curr;
 }
 
+int pq_free(s_pq_t *pq) {
+	s_pq_node_t *buffer;
+
+	for (s_pq_node_t *curr = pq->min; curr; curr = buffer) {
+		buffer = curr->next;
+
+		free(curr);
+	}
+
+	free(pq);
+
+	return 0;
+}
+
 int node_curr_greater(float *node_curr_values, float *meta_curr_values, int value_len) {
 	for (int node_check_curr_values = 0; node_check_curr_values < value_len; node_check_curr_values++) {
 		if (node_curr_values[node_check_curr_values] < meta_curr_values[node_check_curr_values])

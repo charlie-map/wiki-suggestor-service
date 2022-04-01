@@ -23,6 +23,8 @@ typedef struct SearchPriorityQueue {
 s_pq_node_t *skip(s_pq_t *head, int skip_amount);
 s_pq_t *kdtree_search(kdtree_t *k_t, void *dimension, void *search_payload, int max_document_returns, void **current_payloads, int number_of_payloads);
 
+int pq_free(s_pq_t *pq);
+
 void *kdtree_delete(kdtree_t *k_t, void *k_node, ...);
 
 int kdtree_destroy(kdtree_t *k_t);

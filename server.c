@@ -209,7 +209,10 @@ void nearest_neighbor(req_t req, res_t res) {
 	kdtree_load(cluster_rep, (void ***) cluster_docs, closest_cluster->doc_pos_index);
 
 	// search for most relavant document:
-	document_vector_t *return_doc = ((document_vector_t *) kdtree_search(cluster_rep, d_1, curr_doc, 1, (void **) &curr_doc, 1)->min->payload);
+	s_pq_t *result_documents_pq = kdtree_search(cluster_rep, d_1, curr_doc, 1, (void **) &curr_doc, 1);
+	document_vector_t *return_doc = ((document_vector_t *) result_documents_pq->min->payload);
+
+	pq_free(result_documents_pq);
 
 	db_res_destroy(db_r);
 	db_r = db_query(db, "SELECT page_name FROM page WHERE id=?", return_doc->id);
@@ -219,8 +222,10 @@ void nearest_neighbor(req_t req, res_t res) {
 	token_t *page_token = tokenize('s', page_name_tag);
 
 	int *page_name_len = malloc(sizeof(int));
-	char *page_name = token_read_all_data(page_token, page_name_len, NULL, NULL);
+	char *page_name_pre_find = token_read_all_data(page_token, page_name_len, NULL, NULL);
+	char *page_name = find_and_replace(page_name_pre_find, "&amp;", "&");
 
+	free(page_name_pre_find);
 	free(page_name_len);
 
 	res_end(res, page_name);
@@ -231,6 +236,7 @@ void nearest_neighbor(req_t req, res_t res) {
 
 	destroy_token(page_token);
 	kdtree_destroy(cluster_rep);
+	deepdestroy__hashmap(closest_cluster_dimensions);
 	db_res_destroy(db_r);
 
 	return;
@@ -330,6 +336,8 @@ void unique_recommend(req_t req, res_t res) {
 			char *en_dash = malloc(sizeof(char) * 2);
 			sprintf(en_dash, "%c", 150);
 			document_intro = find_and_replace(document_intro_fix_space, en_dash, "-");
+
+			free(en_dash);
 			free(document_intro_fix_space);
 		} else {
 			document_intro = malloc(sizeof(char) * 22);
@@ -345,6 +353,7 @@ void unique_recommend(req_t req, res_t res) {
 		sprintf(doc_titles + sizeof(char) * (curr_doc_titles_len - 1),
 			"{\"title\":\"%s\",\"image\":\"%s\",\"descript\":\"%s\"}", remove_amp_title, image_url, document_intro);
 
+		free(remove_amp_title);
 		curr_doc_titles_len += new_len;
 		if (start_doc->next)
 			doc_titles[curr_doc_titles_len - 2] = ',';
