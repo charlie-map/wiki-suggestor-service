@@ -416,7 +416,7 @@ int read_newline(char **curr_line, size_t *buffer_size, FILE *fp, char *str_read
 	// otherwise search through str_read for a newline
 	int str_read_index = 0;
 
-	while (str_read[0] != '\0') {
+	while (str_read && str_read[0] != '\0') {
 		if (str_read[0] == '\n')
 			break;
 

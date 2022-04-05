@@ -287,6 +287,33 @@ void unique_recommend(req_t req, res_t res) {
 	for (int copy_document_vector = 0; copy_document_vector < db_r->row_count; copy_document_vector++) {
 		char *page_id = (char *) get__hashmap(db_r->row__data[copy_document_vector], "page_id", "");
 		full_document_vectors[copy_document_vector] = get__hashmap(doc_map, page_id, "");
+
+		// need to serialize
+		if (!full_document_vectors[copy_document_vector]) {
+			db_res *db_wiki_page = db_query(db, "SELECT page_name, wiki_page FROM page WHERE id=?", page_id);
+			char *page_title = (char *) get__hashmap(db_wiki_page->row__data[0], "page_name", "");
+			char *page_text = (char *) get__hashmap(db_wiki_page->row__data[0], "wiki_page", "");
+
+			int full_page_len = strlen(page_id) + strlen(page_title) + strlen(page_text) + 59;
+			char *full_page = malloc(sizeof(char) * full_page_len);
+
+			sprintf(full_page, "<page>\n<id>%s</id>\n<title>%s</title>\n<text>%s</text>\n</page>", page_id, page_title, page_text);
+
+			token_t *token_wiki_page = tokenize('s',full_page);
+
+			full_document_vectors[copy_document_vector] = create_document_vector(page_id, page_title, 0);
+
+			pthread_mutex_lock(&(term_freq->mutex));
+			pthread_mutex_lock(&ID_mutex);
+			token_to_terms((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), full_document_vectors[copy_document_vector]);
+			pthread_mutex_unlock(&(term_freq->mutex));
+
+			ID_index++;
+			ID = resize_array(ID, ID_len, ID_index, sizeof(char *));
+
+			pthread_mutex_unlock(&ID_mutex);
+		}
+
 		insert__hashmap(sub_user_doc, page_id, full_document_vectors[copy_document_vector], "", compareCharKey, NULL);
 	}
 
@@ -308,6 +335,13 @@ void unique_recommend(req_t req, res_t res) {
 	doc_titles[0] = '[';
 	doc_titles[1] = '\0';
 
+	hashmap *block_tag_check = make__hashmap(0, NULL, destroy_hashmap_val);
+
+	int *style_value = malloc(sizeof(int));
+	*style_value = 1;
+
+	insert__hashmap(block_tag_check, "style", style_value, "-d");
+
 	for (s_pq_node_t *start_doc = closest_doc_vector->min; start_doc;) {
 		document_vector_t *curr_doc_vec = (document_vector_t *) start_doc->payload;
 
@@ -327,18 +361,20 @@ void unique_recommend(req_t req, res_t res) {
 		// need a way to selectively choose if skips should occur
 		int *document_intro_len = malloc(sizeof(int));
 		token_t *tag_match = grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match);
-		char *document_intro_pre = token_read_all_data(grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match), document_intro_len, NULL, NULL);
+		char *document_intro_pre = token_read_all_data(grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match), document_intro_len, block_tag_check, is_block);
 		char *document_intro;
 		if (*document_intro_len) {
-			char *document_intro_fix_quote = find_and_replace(document_intro_pre, "\"", "\\\"");
+			char *document_intro_fix_quote = find_and_replace(document_intro_pre, "\"", "&ldquo;");
 			char *document_intro_fix_space = find_and_replace(document_intro_fix_quote, "&nbsp;", " ");
+			char *document_intro_fix_tab = find_and_replace(document_intro_fix_space, "\t", " ");
 			free(document_intro_fix_quote);
+			free(document_intro_fix_space);
 			char *en_dash = malloc(sizeof(char) * 2);
 			sprintf(en_dash, "%c", 150);
-			document_intro = find_and_replace(document_intro_fix_space, en_dash, "-");
+			document_intro = find_and_replace(document_intro_fix_tab, en_dash, "-");
 
 			free(en_dash);
-			free(document_intro_fix_space);
+			free(document_intro_fix_tab);
 		} else {
 			document_intro = malloc(sizeof(char) * 22);
 			strcpy(document_intro, "No description found.");
@@ -350,6 +386,7 @@ void unique_recommend(req_t req, res_t res) {
 
 		doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + new_len));
 		char *remove_amp_title = find_and_replace(((document_vector_t *) start_doc->payload)->title, "&amp;", "&");
+
 		sprintf(doc_titles + sizeof(char) * (curr_doc_titles_len - 1),
 			"{\"title\":\"%s\",\"image\":\"%s\",\"descript\":\"%s\"}", remove_amp_title, image_url, document_intro);
 

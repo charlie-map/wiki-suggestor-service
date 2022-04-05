@@ -105,7 +105,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 		cluster[create_centroid]->doc_pos = malloc(sizeof(char *) * 8);
 		cluster[create_centroid]->max_doc_pos = 8;
 		cluster[create_centroid]->doc_pos_index = 0;
-		
+
 		cluster[create_centroid]->sqrt_mag = copyer_hashmap->sqrt_mag;
 
 		cluster[create_centroid]->centroid = new_centroid;
@@ -116,9 +116,8 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 	// fill mean_shifts with 0's initially
 	memset(mean_shifts, 0, sizeof(float) * k);
 	memset(prev_mean_shifts, 0, sizeof(float) * k);
-	
+
 	do {
-		printf("RUNNING\n");
 		// reset clusters and prev_mean_shifts:
 		for (int cluster_reset = 0; cluster_reset < k; cluster_reset++) {
 			cluster[cluster_reset]->doc_pos_index = 0;
@@ -129,7 +128,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 		for (int find_doc_centroid = 0; find_doc_centroid < *doc_ID_len; find_doc_centroid++) {
 
 			document_vector_t *curr_doc = ((document_vector_t *) get__hashmap(doc, doc_ID[find_doc_centroid], ""));
-			
+
 			cluster_t *curr_max_centroid = find_closest_cluster(cluster, k, curr_doc);
 
 			// do something with this information...
