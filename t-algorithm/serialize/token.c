@@ -273,28 +273,21 @@ char *resize_full_data(char *full_data, int *data_max, int data_index) {
 	return full_data;
 }
 
-int token_read_all_data_helper(token_t *search_token, char **full_data, int *data_max, int data_index, void *block_tag, void *(*is_blocked)(void *, char *), int currently_blocked) {
+int token_read_all_data_helper(token_t *search_token, char **full_data, int *data_max, int data_index, void *block_tag, void *(*is_blocked)(void *, char *), int currently_blocked, int recur) {
 	// update reads specifically for %s's first to place sub tabs into the correct places
 	int add_from_child = 0;
 	
 	for (int read_token_data = 0; read_token_data < search_token->data_index; read_token_data++) {
-		if (search_token->data[read_token_data] == '<') {
-			int prev_data_index = data_index;
+		if (search_token->data[read_token_data] == '<' && (read_token_data < search_token->data_index - 1 &&
+			search_token->data[read_token_data + 1] == '>')) {
 			data_index = token_read_all_data_helper(search_token->children[add_from_child], full_data, data_max, data_index, block_tag, is_blocked,
-				block_tag && is_blocked(block_tag, search_token->children[add_from_child]->tag));
-
-			//if (prev_data_index < data_index && (
-			//	data_index > 0 && (*full_data)[data_index - 1] != ' ')) {
-				// add extra space after token addition for ensure no touching words:
-			//	*full_data = resize_full_data(*full_data, data_max, data_index + 2);
-			//	(*full_data)[data_index] = ' ';
-			//	data_index++;
-			//}
+				block_tag && is_blocked(block_tag, search_token->children[add_from_child]->tag), recur);
 
 			// move to next child
 			add_from_child++;
 
 			// skip other process
+			read_token_data++;
 			continue;
 		}
 
@@ -314,13 +307,13 @@ int token_read_all_data_helper(token_t *search_token, char **full_data, int *dat
 }
 
 // go through the entire sub tree and create a char ** of all data values
-char *token_read_all_data(token_t *search_token, int *data_max, void *block_tag, void *(*is_blocked)(void *, char *)) {
+char *token_read_all_data(token_t *search_token, int *data_max, void *block_tag, void *(*is_blocked)(void *, char *), int recur) {
 	int data_index = 0;
 	*data_max = 8;
 	char **full_data = malloc(sizeof(char *));
 	*full_data = malloc(sizeof(char) * *data_max);
 
-	data_index = token_read_all_data_helper(search_token, full_data, data_max, data_index, block_tag, is_blocked, 0);
+	data_index = token_read_all_data_helper(search_token, full_data, data_max, data_index, block_tag, is_blocked, 0, recur);
 
 	(*full_data)[data_index] = 0;
 
@@ -685,6 +678,7 @@ int tokenizeMETA(FILE *file, char *str_read, token_t *curr_tree) {
 				if (tag_read.type == 0) {
 					// add pointer to sub tree within data:
 					add_token_rolling_data(curr_tree, '<');
+					add_token_rolling_data(curr_tree, '>');
 					
 					curr_tree = grab_token_children(curr_tree);
 				}
