@@ -273,7 +273,7 @@ char *resize_full_data(char *full_data, int *data_max, int data_index) {
 	return full_data;
 }
 
-int token_read_all_data_helper(token_t *search_token, char **full_data, int *data_max, int data_index, void *block_tag, void *(*is_blocked)(void *, char *), int currently_blocked, int recur) {
+int token_read_all_data_helper(token_t *search_token, char **full_data, int *data_max, int data_index, void *block_tag, void *(*is_blocked)(void *, char *), int currently_blocked) {
 	// update reads specifically for %s's first to place sub tabs into the correct places
 	int add_from_child = 0;
 	
@@ -281,7 +281,7 @@ int token_read_all_data_helper(token_t *search_token, char **full_data, int *dat
 		if (search_token->data[read_token_data] == '<' && (read_token_data < search_token->data_index - 1 &&
 			search_token->data[read_token_data + 1] == '>')) {
 			data_index = token_read_all_data_helper(search_token->children[add_from_child], full_data, data_max, data_index, block_tag, is_blocked,
-				block_tag && is_blocked(block_tag, search_token->children[add_from_child]->tag), recur);
+				block_tag && is_blocked(block_tag, search_token->children[add_from_child]->tag));
 
 			// move to next child
 			add_from_child++;
@@ -307,13 +307,13 @@ int token_read_all_data_helper(token_t *search_token, char **full_data, int *dat
 }
 
 // go through the entire sub tree and create a char ** of all data values
-char *token_read_all_data(token_t *search_token, int *data_max, void *block_tag, void *(*is_blocked)(void *, char *), int recur) {
+char *token_read_all_data(token_t *search_token, int *data_max, void *block_tag, void *(*is_blocked)(void *, char *)) {
 	int data_index = 0;
 	*data_max = 8;
 	char **full_data = malloc(sizeof(char *));
 	*full_data = malloc(sizeof(char) * *data_max);
 
-	data_index = token_read_all_data_helper(search_token, full_data, data_max, data_index, block_tag, is_blocked, 0, recur);
+	data_index = token_read_all_data_helper(search_token, full_data, data_max, data_index, block_tag, is_blocked, 0);
 
 	(*full_data)[data_index] = 0;
 
