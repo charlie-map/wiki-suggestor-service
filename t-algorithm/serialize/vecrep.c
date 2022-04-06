@@ -119,7 +119,6 @@ int http_pull_to_file(trie_t *stopword_trie) {
 	/* e.g.:
 		socket, idf, index_writer, and title_writer
 	*/
-	printf("%d\n", THREAD_NUMBER / 2);
 	pthread_mutex_t **sock_mutex = malloc(sizeof(pthread_mutex_t *) * (THREAD_NUMBER / 2));
 	socket_t ***socket_holder = malloc(sizeof(socket_t **) * (THREAD_NUMBER / 2));
 	socket_holder[0] = malloc(sizeof(socket_t *));
@@ -237,9 +236,7 @@ void *data_read(void *meta_ptr) {
 	int end_read_body = ser_pt->end_read_body;
 
 	for (int read_body = start_read_body; read_body < end_read_body; read_body++) {
-		printf("lock %d\n", read_body);
 		pthread_mutex_lock(ser_pt->sock_mutex);
-		printf("****locked %d\n", read_body);
 
 		res *wiki_page = send_req(*(ser_pt->sock_data), "/pull_data", "POST", "-b", "unique_id=$&name=$&passcode=$", array_body[read_body], REQ_NAME, REQ_PASSCODE);
 		if (!wiki_page) { // socket close!

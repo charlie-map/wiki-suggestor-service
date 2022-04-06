@@ -302,17 +302,17 @@ int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void
 		return 0;
 
 	if (!k_node->right && !k_node->left) {
-		if (is_not_search_node(k_node->payload, current_payloads, max_document_returns))
+		if (is_not_search_node(k_node->payload, current_payloads, number_of_payloads))
 			insert_pq(curr_s_ll, k_node->payload);
 
 		return 0;
-	} else if (!k_node->right) {
-		if (is_not_search_node(k_node->right->payload, current_payloads, max_document_returns))
+	} else if (!k_node->left) {
+		if (is_not_search_node(k_node->right->payload, current_payloads, number_of_payloads))
 			insert_pq(curr_s_ll, k_node->right->payload);
 
 		return 0;
-	} else if (!k_node->left) {
-		if (is_not_search_node(k_node->left->payload, current_payloads, max_document_returns))
+	} else if (!k_node->right) {
+		if (is_not_search_node(k_node->left->payload, current_payloads, number_of_payloads))
 			insert_pq(curr_s_ll, k_node->left->payload);
 
 		return 0;
