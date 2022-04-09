@@ -426,6 +426,127 @@ void unique_recommend(req_t req, res_t res) {
 	return;
 }
 
+float compute_p_value(int vote, float vote_time, float focus_time, float avvt, float avft) {
+	return ((vote == 3 ? 3.1 : vote) - 3) * ((vote_time == 0 ? 0.1 : vote_time) / 
+		(avvt == 0 ? 0.1 : avvt)) * (focus_time / (avft == 0 ? 0.1 : avft));
+}
+
+void unique_recommend_v2(req_t req, res_t res) {
+	// calculate user id via their uuid
+	char *user_uuid = req_body(req, "uuid");
+
+	if (!user_uuid) {
+		res_end(res, "Missing UUID");
+		return;
+	}
+
+	db_res *db_r = db_query(db, "SELECT id, age, avvt, avft FROM user WHERE unique_id=?", user_uuid);
+
+	if (!db_r->row_count) {
+		db_res_destroy(db_r);
+
+		res_end(res, "No user found");
+		return;
+	}
+
+	// grab user ID
+	char *user_ID = (char *) get__hashmap(db_r->row__data[0], "id", "");
+
+	// get page_id, vote, page_vote_time, and focus_time from view_vote table
+	db_res *user_votes = db_query(db, "SELECT page_id, vote, page_vote_time, focus_time FROM view_vote WHERE user_id=?", user_ID);
+
+	if (!user_votes->row_count) {
+		db_res_destroy(db_r);
+
+		res_end(res, "000"); // some internal code I just made up and will soon forget
+		return;
+	}
+
+	// compute an estimated p value:
+	/*
+		the final desired range is between -1 (strong negative user pref) and 1 (strong positive user pref)
+
+		the most efficient way will be to just compute some number using the following equation and then
+		scale the results down based on the maximum on the negative side and positive side. For example,
+		the following array of initial computed numbers:
+
+		[-5.4, -3, -0.1, 0.25, 3.2]
+
+		would become:
+
+		[-1, -0.56, -0.02, 0.08, 1]
+
+		To compute the initial numbers, the following equation will be used:
+
+		((v1 == 3 ? 3.1 : v1) - 3) * (vt / avvt) * (ft / avft)
+
+		where v1 = vote (1-5, defaults to 4 if they don't vote on it),
+			  vt = vote time (0-?, the time at which they vote in hours, defaults to 0.1
+			  	since any higher will too dramatically alter results)
+			  ft = focus time (0-?, the time focused on the tab)
+
+		SEE compute_p_value
+	*/
+	// create a matrix for storing all of the resultant values:
+	// one x value for v1, v2, and v3
+	// one y value for each document
+	float avvt = atof((char *) get__hashmap(db_r->row__data[0], "avvt", "")),
+		avft = atof((char *) get__hashmap(db_r->row__data[0], "avft", ""));
+
+	matrix_t *doc_vector = matrix_build(3, user_votes->row_count);
+	float **doc_vector_value = malloc(sizeof(float *) * 3);
+	doc_vector_value[0] = malloc(sizeof(float) * user_votes->row_count);
+	doc_vector_value[1] = malloc(sizeof(float) * user_votes->row_count);
+	doc_vector_value[2] = malloc(sizeof(float) * user_votes->row_count);
+	matrix_t *p = matrix_build(1, user_votes->row_count);
+	float **p_value = malloc(sizeof(float *));
+	*p_value = malloc(sizeof(float) * user_votes->row_count);
+
+	float lowest, highest;
+	// compute document vector while updating lowest and highest:
+	for (int copy_document_vector = 0; copy_document_vector < user_votes->row_count; copy_document_vector++) {
+		// add new row to doc_vector_value
+		// vote
+		doc_vector_value[0][copy_document_vector] = atoi((char *) get__hashmap(user_votes->row__data[copy_document_vector], "vote", ""));
+		// vote time
+		doc_vector_value[1][copy_document_vector] = atof((char *) get__hashmap(user_votes->row__data[copy_document_vector], "page_vote_time", ""));
+		// focus time
+		doc_vector_value[2][copy_document_vector] = atof((char *) get__hashmap(user_votes->row__data[copy_document_vector], "focus_time", ""));
+
+		p_value[0][copy_document_vector] = compute_p_value(doc_vector_value[0][copy_document_vector],
+			doc_vector_value[1][copy_document_vector], doc_vector_value[2][copy_document_vector],
+			avvt, avft);
+
+		lowest = copy_document_vector == 0 ? p_value[0][0] :
+			p_value[0][copy_document_vector] < lowest ? p_value[0][copy_document_vector] : lowest;
+		highest = copy_document_vector == 0 ? p_value[0][0] :
+			p_value[0][copy_document_vector] > highest ? p_value[0][copy_document_vector] : highest;
+	}
+
+	// loop through again to scale results to between -1 and 1
+	// this is assumably dividing negative numbers (if there are any)
+	// by lowest (if lowest is negative) and positive numbers (if there are any)
+	// by highest (if highest is positive)
+	for (int copy_document_vector = 0; copy_document_vector < user_votes->row_count; copy_document_vector++) {
+		if (p_value[0][copy_document_vector] < 0)
+			p_value[0][copy_document_vector] /= lowest;
+		else if (p_value[0][copy_document_vector] > 0)
+			p_value[0][copy_document_vector] /= highest;
+	}
+
+	// load matrices before computing the weight vector
+	matrix_load(doc_vector, doc_vector_value);
+	matrix_load(p, p_value);
+
+	// compute weight vector
+	matrix_t *w = matrix_build(1, user_votes->row_count);
+	gradient_descent(doc_vector, w, p);
+
+	// use...
+
+	return;
+}
+
 // build_dimensions functionalities based on vector_type:
 float build_dimension_length(void *curr_vector_group, char vector_type) {
 	return log(vector_type == 'c' ? ((cluster_t *) curr_vector_group)->doc_pos_index : *word_bag_len) + 1;
