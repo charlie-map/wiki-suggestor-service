@@ -157,7 +157,7 @@ heap_node *fixHeap(heap_t *head, heap_node *startNode, int *rankSize, int nodeNu
 	return min;
 }
 
-void *heap_pop(heap_t *head) {
+void *heap_pop(heap_t *head, int hard_destroy) {
 	if (!head->min) // uhhh
 		return NULL;
 
@@ -204,9 +204,14 @@ void *heap_pop(heap_t *head) {
 	// extract payload to return
 	void *prevMinPayload = prevMin->payload;
 	// delete the previous min
-	free(prevMin->weight);
+	if (hard_destroy)
+		free(prevMin->weight);
 	free(prevMin);
 	return prevMinPayload;
+}
+
+int heap_size(heap_t *head) {
+	return head->nodeSum;
 }
 
 int heap_decrease_key(heap_t *head, void *key, void *newWeight) {

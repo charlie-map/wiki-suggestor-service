@@ -8,6 +8,7 @@
 #include "t-algorithm/serialize/serialize.h"
 #include "t-algorithm/serialize/vecrep.h"
 #include "t-algorithm/serialize/token.h"
+#include "t-algorithm/nearest-neighbor/heap.h"
 #include "t-algorithm/nearest-neighbor/kd-tree.h"
 #include "t-algorithm/nearest-neighbor/k-means.h"
 #include "t-algorithm/nearest-neighbor/deserialize.h"
@@ -431,11 +432,72 @@ float compute_p_value(int vote, float vote_time, float focus_time, float avvt, f
 		(avvt == 0 ? 0.1 : avvt)) * (focus_time / (avft == 0 ? 0.1 : avft));
 }
 
+int float_compare(void *f1, void *f2) {
+	return *(float *) f1 < *(float *) f2;
+}
 /*
-	will find highest 
+	will find highest term frequencied words using a heap
 */
 char **compute_best_words(hashmap *user_doc) {
+	// first pull out document IDs:
+	int *user_doc_key_len = malloc(sizeof(int));
+	char **user_doc_key = keys__hashmap(user_doc, user_doc_key_len);
 
+	hashmap *user_term_freq = make__hashmap(0, NULL, destroy_hashmap_float);
+
+	int *doc_key_len = malloc(sizeof(int));
+	for (int user_doc_p = 0; user_doc_p < *user_doc_key_len; user_doc_p++) {
+
+		hashmap *curr_doc = ((document_vector_t *) get__hashmap(user_doc, user_doc_key[user_doc_p], ""))->map;
+		// grab words for specific document
+		char **doc_key = keys__hashmap(curr_doc, doc_key_len);
+
+		// check each term and its frequency and add to user_term_freq hashmap
+		for (int doc_p = 0; doc_p < *doc_key_len; doc_p++) {
+			float *existence = (float *) get__hashmap(user_term_freq, doc_key[doc_p], "");
+			float *doc_v = (float *) get__hashmap(curr_doc, doc_key[doc_p], "");
+
+			if (existence)
+				*existence += *doc_v;
+			else
+				insert__hashmap(user_term_freq, doc_key[doc_p], doc_v, "", compareCharKey, NULL);
+		}
+
+		free(doc_key);
+	}
+
+	// after initial insertions into user_term_freq, use
+	// user_term_freq_pq to find the most important words
+	heap_t *user_term_freq_pq = heap_create(float_compare);
+
+	for (int doc_key_p = 0; doc_key_p < *user_doc_key_len; doc_key_p++) {
+		float *key_freq = (float *) get__hashmap(user_term_freq, user_doc_key[doc_key_p], "");
+
+		heap_push(user_term_freq_pq, user_doc_key[doc_key_p], key_freq);
+
+		if (doc_key_p >= 50)
+			heap_pop(user_term_freq_pq, 0);
+	}
+
+	deepdestroy__hashmap(user_term_freq);
+	// now slowly loop through each heap value and 
+	int heap_len = heap_size(user_term_freq_pq);
+
+	char **best_words = malloc(sizeof(char *) * (heap_len + 1));
+	for (int best = 0; best < heap_len; best++) {
+		best_words[best] = (char *) heap_pop(user_term_freq_pq, 0);
+	}
+
+	best_words[heap_len] = NULL;
+
+	free(doc_key_len);
+
+	free(user_doc_key);
+	free(user_doc_key_len);
+
+	heap_destroy(user_term_freq_pq);
+
+	return best_words;
 }
 
 void unique_recommend_v2(req_t req, res_t res) {
