@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+
+#include <time.h>
 #include <math.h>
 
 // add connections to t-algorithm:
@@ -18,6 +20,13 @@
 
 // database
 #include "databaseC/db.h"
+
+// matrix / linalg
+#include "tests.h"
+#include "vector.h"
+#include "matrix.h"
+#include "rand.h"
+#include "linreg.h"
 
 #include "teru.h"
 
@@ -646,7 +655,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 	struct vector *w = linreg_weight->beta;
 
 	// use weights in w to calculate a ranking scheme for the returned 5 best documents
-	
+
 
 	return;
 }
