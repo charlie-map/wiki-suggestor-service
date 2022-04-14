@@ -180,7 +180,7 @@ void nearest_neighbor(req_t req, res_t res) {
 
 		pthread_mutex_lock(&(term_freq->mutex));
 		pthread_mutex_lock(&ID_mutex);
-		token_to_terms((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), curr_doc);
+		token_to_terms((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), curr_doc, 1);
 		pthread_mutex_unlock(&(term_freq->mutex));
 
 		ID_index++;
@@ -431,6 +431,13 @@ float compute_p_value(int vote, float vote_time, float focus_time, float avvt, f
 		(avvt == 0 ? 0.1 : avvt)) * (focus_time / (avft == 0 ? 0.1 : avft));
 }
 
+/*
+	will find highest 
+*/
+char **compute_best_words(hashmap *user_doc) {
+
+}
+
 void unique_recommend_v2(req_t req, res_t res) {
 	// calculate user id via their uuid
 	char *user_uuid = req_body(req, "uuid");
@@ -487,62 +494,63 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 		SEE compute_p_value
 	*/
-	// create a matrix for storing all of the resultant values:
-	// one x value for v1, v2, and v3
-	// one y value for each document
-	float avvt = atof((char *) get__hashmap(db_r->row__data[0], "avvt", "")),
-		avft = atof((char *) get__hashmap(db_r->row__data[0], "avft", ""));
+	// compute a user vector using all of the users documents (code from unique_recommnder)
+	hashmap *sub_user_doc = make__hashmap(0, NULL, NULL);
+	document_vector_t **full_document_vectors = malloc(sizeof(document_vector_t *) * db_r->row_count);
+	for (int copy_document_vector = 0; copy_document_vector < db_r->row_count; copy_document_vector++) {
+		char *page_id = (char *) get__hashmap(db_r->row__data[copy_document_vector], "page_id", "");
+		full_document_vectors[copy_document_vector] = get__hashmap(doc_map, page_id, "");
 
-	matrix_t *doc_vector = matrix_build(3, user_votes->row_count);
-	float **doc_vector_value = malloc(sizeof(float *) * 3);
-	doc_vector_value[0] = malloc(sizeof(float) * user_votes->row_count);
-	doc_vector_value[1] = malloc(sizeof(float) * user_votes->row_count);
-	doc_vector_value[2] = malloc(sizeof(float) * user_votes->row_count);
-	matrix_t *p = matrix_build(1, user_votes->row_count);
-	float **p_value = malloc(sizeof(float *));
-	*p_value = malloc(sizeof(float) * user_votes->row_count);
+		// need to serialize
+		if (!full_document_vectors[copy_document_vector]) {
+			db_res *db_wiki_page = db_query(db, "SELECT page_name, wiki_page FROM page WHERE id=?", page_id);
+			char *page_title = (char *) get__hashmap(db_wiki_page->row__data[0], "page_name", "");
+			char *page_text = (char *) get__hashmap(db_wiki_page->row__data[0], "wiki_page", "");
 
-	float lowest, highest;
-	// compute document vector while updating lowest and highest:
-	for (int copy_document_vector = 0; copy_document_vector < user_votes->row_count; copy_document_vector++) {
-		// add new row to doc_vector_value
-		// vote
-		doc_vector_value[0][copy_document_vector] = atoi((char *) get__hashmap(user_votes->row__data[copy_document_vector], "vote", ""));
-		// vote time
-		doc_vector_value[1][copy_document_vector] = atof((char *) get__hashmap(user_votes->row__data[copy_document_vector], "page_vote_time", ""));
-		// focus time
-		doc_vector_value[2][copy_document_vector] = atof((char *) get__hashmap(user_votes->row__data[copy_document_vector], "focus_time", ""));
+			int full_page_len = strlen(page_id) + strlen(page_title) + strlen(page_text) + 59;
+			char *full_page = malloc(sizeof(char) * full_page_len);
 
-		p_value[0][copy_document_vector] = compute_p_value(doc_vector_value[0][copy_document_vector],
-			doc_vector_value[1][copy_document_vector], doc_vector_value[2][copy_document_vector],
-			avvt, avft);
+			sprintf(full_page, "<page>\n<id>%s</id>\n<title>%s</title>\n<text>%s</text>\n</page>", page_id, page_title, page_text);
 
-		lowest = copy_document_vector == 0 ? p_value[0][0] :
-			p_value[0][copy_document_vector] < lowest ? p_value[0][copy_document_vector] : lowest;
-		highest = copy_document_vector == 0 ? p_value[0][0] :
-			p_value[0][copy_document_vector] > highest ? p_value[0][copy_document_vector] : highest;
+			token_t *token_wiki_page = tokenize('s',full_page);
+
+			full_document_vectors[copy_document_vector] = create_document_vector(page_id, page_title, 0);
+
+			float term_freq_scalar_value = compute_p_value(atoi((char *) get__hashmap(user_votes->row__data[copy_document_vector], "vote", "")),
+				atof((char *) get__hashmap(user_votes->row__data[copy_document_vector], "page_vote_time", "")),
+				atof((char *) get__hashmap(user_votes->row__data[copy_document_vector], "focus_time", "")),
+				atof((char *) get__hashmap(db_r->row__data[0], "avvt", "")),
+				atof((char *) get__hashmap(db_r->row__data[0], "avft", "")));
+			pthread_mutex_lock(&(term_freq->mutex));
+			pthread_mutex_lock(&ID_mutex);
+			token_to_terms((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), full_document_vectors[copy_document_vector], term_freq_scalar_value);
+			pthread_mutex_unlock(&(term_freq->mutex));
+
+			ID_index++;
+			ID = resize_array(ID, ID_len, ID_index, sizeof(char *));
+
+			pthread_mutex_unlock(&ID_mutex);
+		}
+
+		insert__hashmap(sub_user_doc, page_id, full_document_vectors[copy_document_vector], "", compareCharKey, NULL);
 	}
 
-	// loop through again to scale results to between -1 and 1
-	// this is assumably dividing negative numbers (if there are any)
-	// by lowest (if lowest is negative) and positive numbers (if there are any)
-	// by highest (if highest is positive)
-	for (int copy_document_vector = 0; copy_document_vector < user_votes->row_count; copy_document_vector++) {
-		if (p_value[0][copy_document_vector] < 0)
-			p_value[0][copy_document_vector] /= lowest;
-		else if (p_value[0][copy_document_vector] > 0)
-			p_value[0][copy_document_vector] /= highest;
-	}
+	// otherwise we can move forward to computing a centroid
+	cluster_t **user_cluster_wrapped = k_means(sub_user_doc, 1, CLUSTER_THRESHOLD);
+	cluster_t *user_cluster = *user_cluster_wrapped;
 
-	// load matrices before computing the weight vector
-	matrix_load(doc_vector, doc_vector_value);
-	matrix_load(p, p_value);
+	// finding more than one?
+	document_vector_t *user_doc_vec = malloc(sizeof(document_vector_t));
+	user_doc_vec->sqrt_mag = user_cluster->sqrt_mag;
+	user_doc_vec->map = user_cluster->centroid;
 
-	// compute weight vector
-	matrix_t *w = matrix_build(1, user_votes->row_count);
-	gradient_descent(doc_vector, w, p);
+	pthread_mutex_lock(&(mutex_doc_vector_kdtree->mutex));
+	s_pq_t *closest_doc_vector = kdtree_search(mutex_doc_vector_kdtree->runner, doc_vector_kdtree_start_dimension, user_doc_vec, 5, (void **) full_document_vectors, db_r->row_count);
+	pthread_mutex_unlock(&(mutex_doc_vector_kdtree->mutex));
 
-	// use...
+	// find top 50 words from within the user_cluster to create a ranking
+	// matrix that correlates to the votes on pages
+	char **user_words_top50 = compute_best_words(sub_user_doc);
 
 	return;
 }

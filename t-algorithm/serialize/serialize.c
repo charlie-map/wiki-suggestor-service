@@ -63,7 +63,7 @@ int is_m(void *tf, void *extra) {
 	so bring mutex attr with them
 */
 int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
-	token_t *full_page, char **ID, document_vector_t *opt_doc) {
+	token_t *full_page, char **ID, document_vector_t *opt_doc, float frequency_scalar) {
 	int total_bag_size = 0;
 
 	// create title page:
@@ -145,8 +145,9 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 				if (opt_doc) {
 					float *opt_map_value = get__hashmap(opt_doc->map, full_page_data[add_hash], "");
 
-					if (opt_map_value)
-						*opt_map_value++;
+					if (opt_map_value) {
+						*opt_map_value += 1 * frequency_scalar;
+					}
 				}
 			} else { // reset features
 				hashmap_freq->tfs += hashmap_freq->curr_term_freq;
@@ -162,7 +163,7 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 				// setup document_vector_t if there
 				if (opt_doc) {
 					float *new_opt_map_value = malloc(sizeof(float));
-					*new_opt_map_value = 1;
+					*new_opt_map_value = 1 * frequency_scalar;
 					
 					insert__hashmap(opt_doc->map, full_page_data[add_hash], new_opt_map_value, "", compareCharKey, NULL);
 				}
