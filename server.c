@@ -38,6 +38,8 @@
 
 #define RELOAD 0
 
+#define RECOMMENDER_DOC_NUMBER 5
+
 MYSQL *db;
 
 trie_t *stopword_trie;
@@ -617,7 +619,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 	user_doc_vec->map = user_cluster->centroid;
 
 	pthread_mutex_lock(&(mutex_doc_vector_kdtree->mutex));
-	s_pq_t *closest_doc_vector = kdtree_search(mutex_doc_vector_kdtree->runner, doc_vector_kdtree_start_dimension, user_doc_vec, 5, (void **) full_document_vectors, db_r->row_count);
+	s_pq_t *closest_doc_vector = kdtree_search(mutex_doc_vector_kdtree->runner, doc_vector_kdtree_start_dimension, user_doc_vec, RECOMMENDER_DOC_NUMBER, (void **) full_document_vectors, db_r->row_count);
 	pthread_mutex_unlock(&(mutex_doc_vector_kdtree->mutex));
 
 	// find top 50 words from within the user_cluster to create a ranking
@@ -655,8 +657,149 @@ void unique_recommend_v2(req_t req, res_t res) {
 	struct vector *w = linreg_weight->beta;
 
 	// use weights in w to calculate a ranking scheme for the returned 5 best documents
+	int current_placed_recommended = 0;
+	double *recommended_doc_vec_ranks = malloc(sizeof(double) * RECOMMENDER_DOC_NUMBER);
+	memset(recommended_doc_vec_ranks, 0, sizeof(double) * RECOMMENDER_DOC_NUMBER);
+	
+	document_vector_t **recommended_doc_vec_order = malloc(sizeof(document_vector_t *) * RECOMMENDER_DOC_NUMBER);
+	memset(recommended_doc_vec_order, NULL, sizeof(document_vector_t *) * RECOMMENDER_DOC_NUMBER);
 
+	for (s_pq_node_t *curr_doc_vec = closest_doc_vector->min; curr_doc_vec;) {
+		document_vector_t *cdv = (document_vector_t *) start_doc->payload;
 
+		double *doc_vec_key = malloc(sizeof(double) * *real_user_words_len);
+
+		for (int get_key = 0; get_key < *real_user_words_len; get_key++) {
+			float *doc_term_freq = (float *) get__hashmap(cdv->map, user_words_top50[get_key], "");
+
+			doc_vec_key[get_key] = doc_term_freq ? *doc_term_freq : 0;
+		}
+
+		struct vector *doc_v = vector_from_array(doc_vec_key, *real_user_words_len);
+
+		double resultant_y = vector_dot_product(doc_v, w);
+		vector_free(doc_v);
+
+		// find position in recommended_doc_vec_ranks and recommended_doc_vec_order
+		// for new document based on the weight
+		int document_placement;
+		for (document_placement = 0; document_placement < current_placed_recommended; document_placement++) {
+			if (resultant_y > recommended_doc_vec_ranks[document_placement])
+				break;
+		}
+
+		// based on document_placement, splice in the new document:
+		double rank_buffer; document_vector_t *doc_vec_buffer;
+		for (document_placement; document_placement < current_placed_recommended; document_placement++) {
+			rank_buffer = recommended_doc_vec_ranks[document_placement];
+			recommended_doc_vec_ranks[document_placement] = resultant_y;
+
+			doc_vec_buffer = recommended_doc_vec_order[document_placement];
+			recommended_doc_vec_order[document_placement] = cdv;
+		}
+
+		current_placed_recommended++;
+
+		vector_free(doc_v);
+	}
+
+	linreg_free(linreg_weight);
+	free(recommended_doc_vec_ranks);
+	// with sorted recommended_doc_vec_order, loop through them and
+	// compute the data to send to frontend:
+	int curr_doc_titles_len = 256;
+	char *doc_titles = malloc(sizeof(char) * curr_doc_titles_len);
+	doc_titles[0] = '[';
+	doc_titles[1] = '\0';
+
+	hashmap *block_tag_check = make__hashmap(0, NULL, destroy_hashmap_val);
+
+	int *style_value = malloc(sizeof(int));
+	*style_value = 1;
+
+	insert__hashmap(block_tag_check, "style", style_value, "-d");
+
+	for (int compute_title_style = 0; compute_title_style < current_placed_recommended + 1; compute_title_style++) {
+		document_vector_t *curr_doc_vec = recommended_doc_vec_order[compute_title_style];
+
+		db_res *db_doc = db_query(db, "SELECT wiki_page FROM page WHERE id=?", curr_doc_vec->id);
+
+		token_t *token_curr_doc_vec = tokenize('s', (char *) get__hashmap(db_doc->row__data[0], "wiki_page", ""));
+
+		db_res_destroy(db_doc);
+		// a couple of data items we can grab:
+		// first image we encounter
+		token_t *get_first_image = grab_token_by_tag_maxsearch(token_curr_doc_vec, "img", 20);
+		char *image_url = get_first_image ? token_attr(get_first_image, "src") + sizeof(char) * 2 : "";
+		// first couple blips of text within first p tag in div.mw-parser-output
+
+		token_t *get_mw_parser_output = grab_token_by_classname(token_curr_doc_vec, "mw-parser-output");
+		// then select p tags, (maybe look at first couple?)
+		// need a way to selectively choose if skips should occur
+		int *document_intro_len = malloc(sizeof(int));
+		token_t *tag_match = grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match);
+		char *document_intro_pre = token_read_all_data(grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match), document_intro_len, block_tag_check, is_block);
+		char *document_intro;
+		if (*document_intro_len) {
+			char *document_intro_fix_quote = find_and_replace(document_intro_pre, "\"", "&ldquo;");
+			char *document_intro_fix_space = find_and_replace(document_intro_fix_quote, "&nbsp;", " ");
+			char *document_intro_fix_tab = find_and_replace(document_intro_fix_space, "\t", " ");
+			free(document_intro_fix_quote);
+			free(document_intro_fix_space);
+			char *en_dash = malloc(sizeof(char) * 2);
+			sprintf(en_dash, "%c", 150);
+			document_intro = find_and_replace(document_intro_fix_tab, en_dash, "-");
+
+			free(en_dash);
+			free(document_intro_fix_tab);
+		} else {
+			document_intro = malloc(sizeof(char) * 22);
+			strcpy(document_intro, "No description found.");
+		}
+
+		free(document_intro_pre);
+
+		int new_len = strlen(curr_doc_vec->title) + strlen(image_url) + strlen(document_intro) + 38;
+
+		doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + new_len));
+		char *remove_amp_title = find_and_replace(((document_vector_t *) start_doc->payload)->title, "&amp;", "&");
+
+		sprintf(doc_titles + sizeof(char) * (curr_doc_titles_len - 1),
+			"{\"title\":\"%s\",\"image\":\"%s\",\"descript\":\"%s\"}", remove_amp_title, image_url, document_intro);
+
+		free(remove_amp_title);
+		curr_doc_titles_len += new_len;
+		if (start_doc->next)
+			doc_titles[curr_doc_titles_len - 2] = ',';
+
+		doc_titles[curr_doc_titles_len - 1] = '\0';
+
+		free(document_intro_len);
+		free(document_intro);
+                destroy_token(token_curr_doc_vec);
+
+		s_pq_node_t *next = start_doc->next;
+		free(start_doc);
+
+		start_doc = next;
+	}
+
+	doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + 1));
+	strcat(doc_titles, "]");
+
+	free(full_document_vectors);
+	free(closest_doc_vector);
+	free(user_doc_vec);
+
+	db_res_destroy(db_r);
+
+	// destroy user maps
+	deepdestroy__hashmap(sub_user_doc);
+	destroy_cluster(user_cluster_wrapped, 1);
+
+	res_end(res, doc_titles);
+
+	free(doc_titles);
 	return;
 }
 
