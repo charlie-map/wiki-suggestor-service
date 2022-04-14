@@ -197,7 +197,7 @@ cluster_t **k_means(hashmap *doc, int k, int cluster_threshold) {
 		for (int setup_empty_cluster = 0; setup_empty_cluster < empty_cluster_index; setup_empty_cluster++) {
 			curr_cluster = cluster[empty_cluster[setup_empty_cluster]];
 
-			document_vector_heap_rep_t* document_vector_to_add_pos = heap_pop(heap_document_high_distance_v_centroid);
+			document_vector_heap_rep_t* document_vector_to_add_pos = heap_pop(heap_document_high_distance_v_centroid, 1);
 
 			// set position in original cluster to NULL
 			char *document_vector_ID = cluster[document_vector_to_add_pos->curr_cluster]->doc_pos[document_vector_to_add_pos->doc_pos_index];

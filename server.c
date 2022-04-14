@@ -22,11 +22,10 @@
 #include "databaseC/db.h"
 
 // matrix / linalg
-#include "tests.h"
-#include "vector.h"
-#include "matrix.h"
-#include "rand.h"
-#include "linreg.h"
+#include "matrix/vector.h"
+#include "matrix/matrix.h"
+#include "matrix/rand.h"
+#include "matrix/linreg.h"
 
 #include "teru.h"
 
@@ -65,7 +64,7 @@ void *next_dimension(void *dimensions, void *curr_dimension);
 hashmap *build_dimensions(char ***dimension_groups, void *curr_vector_group, char vector_type);
 
 void nearest_neighbor(req_t req, res_t res);
-void unique_recommend(req_t req, res_t res);
+void unique_recommend_v2(req_t req, res_t res);
 
 int main() {
 	teru_t app = teru();
@@ -272,7 +271,7 @@ int float_compare(void *f1, void *f2) {
 char **compute_best_words(hashmap *user_doc, int *final_len) {
 	// first pull out document IDs:
 	int *user_doc_key_len = malloc(sizeof(int));
-	char **user_doc_key = (char **) keys__hashmap(user_doc, user_doc_key_len);
+	char **user_doc_key = (char **) keys__hashmap(user_doc, user_doc_key_len, "");
 
 	hashmap *user_term_freq = make__hashmap(0, NULL, destroy_hashmap_float);
 
@@ -281,7 +280,7 @@ char **compute_best_words(hashmap *user_doc, int *final_len) {
 
 		hashmap *curr_doc = ((document_vector_t *) get__hashmap(user_doc, user_doc_key[user_doc_p], ""))->map;
 		// grab words for specific document
-		char **doc_key = (char **) keys__hashmap(curr_doc, doc_key_len);
+		char **doc_key = (char **) keys__hashmap(curr_doc, doc_key_len, "");
 
 		// check each term and its frequency and add to user_term_freq hashmap
 		for (int doc_p = 0; doc_p < *doc_key_len; doc_p++) {
@@ -327,7 +326,7 @@ char **compute_best_words(hashmap *user_doc, int *final_len) {
 	free(user_doc_key);
 	free(user_doc_key_len);
 
-	heap_destroy(user_term_freq_pq);
+	heap_destroy(&user_term_freq_pq);
 
 	return best_words;
 }
@@ -466,7 +465,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 	}
 
 	// compute the weight for each term:
-	struct matrix *A = matrix_from_array(term_matrix, user_votes->row_couont, *real_user_words_len);
+	struct matrix *A = matrix_from_array(term_matrix, user_votes->row_count, *real_user_words_len);
 	struct vector *y = vector_from_array(resultant_y, user_votes->row_count);
 
 	struct linreg *linreg_weight = linreg_fit(A, y);
@@ -482,10 +481,11 @@ void unique_recommend_v2(req_t req, res_t res) {
 	memset(recommended_doc_vec_ranks, 0, sizeof(double) * RECOMMENDER_DOC_NUMBER);
 	
 	document_vector_t **recommended_doc_vec_order = malloc(sizeof(document_vector_t *) * RECOMMENDER_DOC_NUMBER);
-	memset(recommended_doc_vec_order, NULL, sizeof(document_vector_t *) * RECOMMENDER_DOC_NUMBER);
+	for (int set_mem = 0; set_mem < RECOMMENDER_DOC_NUMBER; set_mem++)
+		recommended_doc_vec_order[set_mem] = NULL;
 
 	for (s_pq_node_t *curr_doc_vec = closest_doc_vector->min; curr_doc_vec;) {
-		document_vector_t *cdv = (document_vector_t *) start_doc->payload;
+		document_vector_t *cdv = (document_vector_t *) curr_doc_vec->payload;
 
 		double *doc_vec_key = malloc(sizeof(double) * *real_user_words_len);
 
@@ -582,26 +582,21 @@ void unique_recommend_v2(req_t req, res_t res) {
 		int new_len = strlen(curr_doc_vec->title) + strlen(image_url) + strlen(document_intro) + 38;
 
 		doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + new_len));
-		char *remove_amp_title = find_and_replace(((document_vector_t *) start_doc->payload)->title, "&amp;", "&");
+		char *remove_amp_title = find_and_replace(curr_doc_vec->title, "&amp;", "&");
 
 		sprintf(doc_titles + sizeof(char) * (curr_doc_titles_len - 1),
 			"{\"title\":\"%s\",\"image\":\"%s\",\"descript\":\"%s\"}", remove_amp_title, image_url, document_intro);
 
 		free(remove_amp_title);
 		curr_doc_titles_len += new_len;
-		if (start_doc->next)
+		if (compute_title_style < current_placed_recommended)
 			doc_titles[curr_doc_titles_len - 2] = ',';
 
 		doc_titles[curr_doc_titles_len - 1] = '\0';
 
 		free(document_intro_len);
 		free(document_intro);
-                destroy_token(token_curr_doc_vec);
-
-		s_pq_node_t *next = start_doc->next;
-		free(start_doc);
-
-		start_doc = next;
+        destroy_token(token_curr_doc_vec);
 	}
 
 	doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + 1));
