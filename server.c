@@ -297,17 +297,23 @@ char **compute_best_words(hashmap *user_doc, int *final_len) {
 	}
 
 	// after initial insertions into user_term_freq, use
-	// user_term_freq_pq to find the most important words
+	// user_term_freq_pq to find the most important words in user_term_freq
 	heap_t *user_term_freq_pq = heap_create(float_compare);
 
-	for (int doc_key_p = 0; doc_key_p < *user_doc_key_len; doc_key_p++) {
-		float *key_freq = (float *) get__hashmap(user_term_freq, user_doc_key[doc_key_p], "");
+	int *user_term_freq_key_len = malloc(sizeof(int));
+	char **user_term_freq_key = (char **) keys__hashmap(user_term_freq, user_term_freq_key_len, "");
 
-		heap_push(user_term_freq_pq, user_doc_key[doc_key_p], key_freq);
+	for (int doc_key_p = 0; doc_key_p < *user_term_freq_key_len; doc_key_p++) {
+		float *key_freq = (float *) get__hashmap(user_term_freq, user_term_freq_key[doc_key_p], "");
+
+		heap_push(user_term_freq_pq, user_term_freq_key[doc_key_p], key_freq);
 
 		if (doc_key_p >= 50)
 			heap_pop(user_term_freq_pq, 0);
 	}
+
+	free(user_term_freq_key_len);
+	free(user_term_freq_key);
 
 	deepdestroy__hashmap(user_term_freq);
 	// now slowly loop through each heap value and 
@@ -316,6 +322,7 @@ char **compute_best_words(hashmap *user_doc, int *final_len) {
 	char **best_words = malloc(sizeof(char *) * (heap_len + 1));
 	for (int best = 0; best < heap_len; best++) {
 		best_words[best] = (char *) heap_pop(user_term_freq_pq, 0);
+		printf("add word: %s\n", best_words[best]);
 	}
 
 	best_words[heap_len] = NULL;
@@ -389,7 +396,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 	*/
 	// compute a user vector using all of the users documents (code from unique_recommnder)
 	hashmap *sub_user_doc = make__hashmap(0, NULL, NULL);
-	document_vector_t **full_document_vectors = malloc(sizeof(document_vector_t *) * db_r->row_count);
+	document_vector_t **full_document_vectors = malloc(sizeof(document_vector_t *) * user_votes->row_count);
 	for (int copy_document_vector = 0; copy_document_vector < user_votes->row_count; copy_document_vector++) {
 		char *page_id = (char *) get__hashmap(user_votes->row__data[copy_document_vector], "page_id", "");
 		full_document_vectors[copy_document_vector] = get__hashmap(doc_map, page_id, "");
@@ -458,6 +465,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 		resultant_y[doc_vec_p] = atof((char *) get__hashmap(user_votes->row__data[doc_vec_p], "vote", "")) - 2;
 
 		for (int word_p = 0; word_p < *real_user_words_len; word_p++) {
+			printf("%s\n", user_words_top50[word_p]);
 			float *doc_term_freq = (float *) get__hashmap(full_document_vectors[doc_vec_p]->map, user_words_top50[word_p], "");
 
 			term_matrix[row_jump + word_p] = doc_term_freq ? *doc_term_freq : 0;
