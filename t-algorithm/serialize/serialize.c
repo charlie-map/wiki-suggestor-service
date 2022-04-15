@@ -86,7 +86,7 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 	fputs(*ID, title_fp->runner);
 	fputs(":", title_fp->runner);
 	fputs(title, title_fp->runner);
-	
+
 	free(title_len);
 	free(title);
 
@@ -164,7 +164,7 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 				if (opt_doc) {
 					float *new_opt_map_value = malloc(sizeof(float));
 					*new_opt_map_value = 1 * frequency_scalar;
-					
+
 					insert__hashmap(opt_doc->map, full_page_data[add_hash], new_opt_map_value, "", compareCharKey, NULL);
 				}
 			}

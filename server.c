@@ -52,6 +52,7 @@ char **doc_vector_kdtree_dimensions, *doc_vector_kdtree_start_dimension;
 mutex_t *mutex_doc_vector_kdtree;
 
 int *word_bag_len;
+mutex_t *doc_freq;
 mutex_t *term_freq;
 mutex_t *title_fp;
 
@@ -79,6 +80,7 @@ int main() {
 		http_pull_to_file(stopword_trie);
 
 	hashmap *term_freq_map = make__hashmap(0, NULL, destroy_tf_t);
+	hashmap *doc_freq_map = make__hashmap(0, NULL, destroy_int);
 	doc_map = make__hashmap(0, NULL, hm_destroy_hashmap_body);
 
 	ID_len = malloc(sizeof(int)); *ID_len = 8; ID_index = 0;
@@ -286,10 +288,13 @@ char **compute_best_words(hashmap *user_doc, hashmap *user_term_freq, int *final
 			float *existence = (float *) get__hashmap(user_term_freq, doc_key[doc_p], "");
 			float *doc_v = (float *) get__hashmap(curr_doc, doc_key[doc_p], "");
 
-			if (existence)
+			if (existence) {
 				*existence += *doc_v;
-			else
-				insert__hashmap(user_term_freq, doc_key[doc_p], doc_v, "", compareCharKey, NULL);
+			} else {
+				float *new_term_freq = malloc(sizeof(float));
+				*new_term_freq = 1.0 + (doc_v ? *doc_v : 0);
+				insert__hashmap(user_term_freq, doc_key[doc_p], new_term_freq, "", compareCharKey, NULL);
+			}
 		}
 
 		free(doc_key);
@@ -413,14 +418,9 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 			full_document_vectors[copy_document_vector] = create_document_vector(page_id, page_title, 0);
 
-			float term_freq_scalar_value = compute_p_value(atoi((char *) get__hashmap(user_votes->row__data[copy_document_vector], "vote", "")),
-				atof((char *) get__hashmap(user_votes->row__data[copy_document_vector], "page_vote_time", "")),
-				atof((char *) get__hashmap(user_votes->row__data[copy_document_vector], "focus_time", "")),
-				atof((char *) get__hashmap(db_r->row__data[0], "avvt", "")),
-				atof((char *) get__hashmap(db_r->row__data[0], "avft", "")));
 			pthread_mutex_lock(&(term_freq->mutex));
 			pthread_mutex_lock(&ID_mutex);
-			token_to_terms((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), full_document_vectors[copy_document_vector], term_freq_scalar_value);
+			token_to_terms((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), full_document_vectors[copy_document_vector], 1);
 			pthread_mutex_unlock(&(term_freq->mutex));
 
 			ID_index++;
@@ -429,6 +429,11 @@ void unique_recommend_v2(req_t req, res_t res) {
 			pthread_mutex_unlock(&ID_mutex);
 		}
 
+		int *key_len = malloc(sizeof(int));
+		char **doc_d = (char **) keys__hashmap(full_document_vectors[copy_document_vector]->map, key_len, "");
+		for (int i = 0; i < *key_len; i++) {
+			printf("%s -- %1.3f\n", doc_d[i], *(float *) get__hashmap(full_document_vectors[copy_document_vector]->map, doc_d[i], ""));
+		}
 		insert__hashmap(sub_user_doc, page_id, full_document_vectors[copy_document_vector], "", compareCharKey, NULL);
 	}
 
@@ -460,17 +465,31 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 		// loop through words and find the term freq to place into the term_matrix
 		// also make sure to update the vote value in resultant_y
-		resultant_y[doc_vec_p] = atof((char *) get__hashmap(user_votes->row__data[doc_vec_p], "vote", "")) - 2;
+		resultant_y[doc_vec_p] = atof((char *) get__hashmap(user_votes->row__data[doc_vec_p], "vote", ""));
+		resultant_y[doc_vec_p] = resultant_y[doc_vec_p] == 0 ? 1 : resultant_y[doc_vec_p] == 2 ?
+			-0.1 : resultant_y[doc_vec_p] - 2;
 
 		for (int word_p = 0; word_p < *real_user_words_len; word_p++) {
 			float *doc_term_freq = (float *) get__hashmap(full_document_vectors[doc_vec_p]->map, user_words_top50[word_p], "");
 
-			term_matrix[row_jump + word_p] = doc_term_freq ? *doc_term_freq : 0;
+			term_matrix[row_jump + word_p] = doc_term_freq ? (*doc_term_freq == 0 ? 0.1 : *doc_term_freq) : 0.1;
 		}
 	}
 
 	deepdestroy__hashmap(user_term_freq);
 	// compute the weight for each term:
+	for (int check_matrix = 0; check_matrix < user_votes->row_count * *real_user_words_len; check_matrix++) {
+		printf("%s - %1.3f\n", user_words_top50[check_matrix % *real_user_words_len],  term_matrix[check_matrix]);
+
+		if (check_matrix != 0 && check_matrix + 1 % *real_user_words_len == 0)
+			printf("\nNEXT DOC\n");
+	}
+
+	printf("\n\ncheck y\n");
+	for (int check_y = 0; check_y < user_votes->row_count; check_y++) {
+		printf("%1.3f\n", resultant_y[check_y]);
+	}
+
 	struct matrix *A = matrix_from_array(term_matrix, user_votes->row_count, *real_user_words_len);
 	struct vector *y = vector_from_array(resultant_y, user_votes->row_count);
 
@@ -485,7 +504,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 	int current_placed_recommended = 0;
 	double *recommended_doc_vec_ranks = malloc(sizeof(double) * RECOMMENDER_DOC_NUMBER);
 	memset(recommended_doc_vec_ranks, 0, sizeof(double) * RECOMMENDER_DOC_NUMBER);
-	
+
 	document_vector_t **recommended_doc_vec_order = malloc(sizeof(document_vector_t *) * RECOMMENDER_DOC_NUMBER);
 	for (int set_mem = 0; set_mem < RECOMMENDER_DOC_NUMBER; set_mem++)
 		recommended_doc_vec_order[set_mem] = NULL;

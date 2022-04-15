@@ -168,8 +168,6 @@ int http_pull_to_file(trie_t *stopword_trie) {
 	free(title_writer_mutex);
 	fclose(title_writer);
 
-	trie_destroy(stopword_trie);
-
 	/* SAVE term freq and idf AND CREATE A DIFFERENT PROGRAM FOR BELOW */
 	// in form:
 		// word DF:ID,freq|ID,freq|\n
