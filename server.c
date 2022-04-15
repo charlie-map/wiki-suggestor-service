@@ -52,7 +52,6 @@ char **doc_vector_kdtree_dimensions, *doc_vector_kdtree_start_dimension;
 mutex_t *mutex_doc_vector_kdtree;
 
 int *word_bag_len;
-mutex_t *doc_freq;
 mutex_t *term_freq;
 mutex_t *title_fp;
 
@@ -80,7 +79,6 @@ int main() {
 		http_pull_to_file(stopword_trie);
 
 	hashmap *term_freq_map = make__hashmap(0, NULL, destroy_tf_t);
-	hashmap *doc_freq_map = make__hashmap(0, NULL, destroy_int);
 	doc_map = make__hashmap(0, NULL, hm_destroy_hashmap_body);
 
 	ID_len = malloc(sizeof(int)); *ID_len = 8; ID_index = 0;
@@ -287,12 +285,15 @@ char **compute_best_words(hashmap *user_doc, hashmap *user_term_freq, int *final
 		for (int doc_p = 0; doc_p < *doc_key_len; doc_p++) {
 			float *existence = (float *) get__hashmap(user_term_freq, doc_key[doc_p], "");
 			float *doc_v = (float *) get__hashmap(curr_doc, doc_key[doc_p], "");
+			pthread_mutex_lock(&term_freq->mutex);
+			int doc_freq = ((tf_t *) get__hashmap(term_freq->runner, doc_key[doc_p], ""))->doc_freq;
+			pthread_mutex_unlock(&term_freq->mutex);
 
 			if (existence) {
-				*existence += *doc_v;
+				*existence += (doc_v ? *doc_v : 0) * doc_freq;
 			} else {
 				float *new_term_freq = malloc(sizeof(float));
-				*new_term_freq = 1.0 + (doc_v ? *doc_v : 0);
+				*new_term_freq = 1.0 + (doc_v ? *doc_v * doc_freq : 0);
 				insert__hashmap(user_term_freq, doc_key[doc_p], new_term_freq, "", compareCharKey, NULL);
 			}
 		}
