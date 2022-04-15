@@ -10,6 +10,7 @@ void *heap_peek(heap_t *head);
 void *heap_pop(heap_t *head, int hard_destroy);
 
 int heap_size(heap_t *head);
+int heap_check_size(heap_t *head);
 
 int heap_decrease_key(heap_t *head, void *node, void *newWeight);
 

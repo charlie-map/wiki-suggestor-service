@@ -265,15 +265,14 @@ float compute_p_value(int vote, float vote_time, float focus_time, float avvt, f
 int float_compare(void *f1, void *f2) {
 	return *(float *) f1 < *(float *) f2;
 }
+
 /*
 	will find highest term frequencied words using a heap
 */
-char **compute_best_words(hashmap *user_doc, int *final_len) {
+char **compute_best_words(hashmap *user_doc, hashmap *user_term_freq, int *final_len) {
 	// first pull out document IDs:
 	int *user_doc_key_len = malloc(sizeof(int));
 	char **user_doc_key = (char **) keys__hashmap(user_doc, user_doc_key_len, "");
-
-	hashmap *user_term_freq = make__hashmap(0, NULL, destroy_hashmap_float);
 
 	int *doc_key_len = malloc(sizeof(int));
 	for (int user_doc_p = 0; user_doc_p < *user_doc_key_len; user_doc_p++) {
@@ -308,22 +307,20 @@ char **compute_best_words(hashmap *user_doc, int *final_len) {
 
 		heap_push(user_term_freq_pq, user_term_freq_key[doc_key_p], key_freq);
 
-		if (doc_key_p >= 50)
+		if (doc_key_p >= 50) {
 			heap_pop(user_term_freq_pq, 0);
+		}
 	}
 
 	free(user_term_freq_key_len);
 	free(user_term_freq_key);
 
-	deepdestroy__hashmap(user_term_freq);
-	// now slowly loop through each heap value and 
+	// now slowly loop through each heap value
 	int heap_len = heap_size(user_term_freq_pq);
 
 	char **best_words = malloc(sizeof(char *) * (heap_len + 1));
-	for (int best = 0; best < heap_len; best++) {
+	for (int best = 0; best < heap_len; best++)
 		best_words[best] = (char *) heap_pop(user_term_freq_pq, 0);
-		printf("add word: %s\n", best_words[best]);
-	}
 
 	best_words[heap_len] = NULL;
 	*final_len = heap_len;
@@ -450,8 +447,9 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 	// find top 50 words from within the user_cluster to create a ranking
 	// matrix that correlates to the votes on pages
+	hashmap *user_term_freq = make__hashmap(0, NULL, destroy_hashmap_float);
 	int *real_user_words_len = malloc(sizeof(int));
-	char **user_words_top50 = compute_best_words(sub_user_doc, real_user_words_len);
+	char **user_words_top50 = compute_best_words(sub_user_doc, user_term_freq, real_user_words_len);
 
 	// create matrix with the term frequency of the top 50 words of each document:
 	double *term_matrix = malloc(sizeof(double) * (*real_user_words_len * user_votes->row_count));
@@ -465,13 +463,13 @@ void unique_recommend_v2(req_t req, res_t res) {
 		resultant_y[doc_vec_p] = atof((char *) get__hashmap(user_votes->row__data[doc_vec_p], "vote", "")) - 2;
 
 		for (int word_p = 0; word_p < *real_user_words_len; word_p++) {
-			printf("%s\n", user_words_top50[word_p]);
 			float *doc_term_freq = (float *) get__hashmap(full_document_vectors[doc_vec_p]->map, user_words_top50[word_p], "");
 
 			term_matrix[row_jump + word_p] = doc_term_freq ? *doc_term_freq : 0;
 		}
 	}
 
+	deepdestroy__hashmap(user_term_freq);
 	// compute the weight for each term:
 	struct matrix *A = matrix_from_array(term_matrix, user_votes->row_count, *real_user_words_len);
 	struct vector *y = vector_from_array(resultant_y, user_votes->row_count);
