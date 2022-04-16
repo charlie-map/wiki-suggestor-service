@@ -438,6 +438,8 @@ struct qr_decomp* matrix_qr_decomposition(struct matrix* M) {
         }
         norm = vector_norm(current_column);
         // TODO: Check for zero norm here, indicating the the matrix is not full rank.
+	if (norm == 0)
+		break;
         MATRIX_IDX_INTO(r, i, i) = norm;
         vector_normalize_into(current_column, current_column);
         matrix_copy_vector_into_column(q, current_column, i);

@@ -207,6 +207,7 @@ struct vector* vector_normalize(struct vector* v) {
 
 void vector_normalize_into(struct vector* reciever, struct vector* v) {
     double norm = vector_norm(v);
+    printf("norm check %lf\n", norm);
     assert(norm != 0);
     for(int i = 0; i < v->length; i++) {
         VECTOR_IDX_INTO(reciever, i) = VECTOR_IDX_INTO(v, i) / norm;
