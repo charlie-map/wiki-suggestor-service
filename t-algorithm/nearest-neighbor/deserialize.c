@@ -189,7 +189,7 @@ cluster_t **deserialize_cluster(char *filename, int k, hashmap *doc_map, char **
 
 	size_t cluster_string_size = sizeof(char);
 	char *cluster_string = malloc(cluster_string_size);
-	
+
 	int *line_len = malloc(sizeof(int));
 	int *doc_key_len = malloc(sizeof(int));
 
@@ -198,7 +198,6 @@ cluster_t **deserialize_cluster(char *filename, int k, hashmap *doc_map, char **
 
 		getline(&cluster_string, &cluster_string_size, read_cluster);
 		char **cluster_data = split_string(cluster_string, ' ', line_len, "-d-r", is_delim, " :,", NULL);
-		printf("LINE: %d\n", *line_len);
 
 		// first value is just the cluster mag:
 		cluster[curr_cluster]->sqrt_mag = atof(cluster_data[0]);
@@ -220,7 +219,6 @@ cluster_t **deserialize_cluster(char *filename, int k, hashmap *doc_map, char **
 		// and recompute the centroid hashmap
 		int read_doc;
 		for (read_doc = 0; read_doc < doc_pos_index; read_doc++) {
-			printf("%s\n", cluster_data[read_doc + 2]);
 			char *doc_key = getKey__hashmap(doc_map, cluster_data[read_doc + 2]);
 			if (!doc_key)
                                 continue;

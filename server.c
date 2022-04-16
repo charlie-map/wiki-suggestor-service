@@ -533,6 +533,8 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 			current_placed_recommended++;
 		}
+	} else {
+		current_placed_recommended = 4;
 	}
 
 	free(recommended_doc_vec_ranks);
@@ -548,12 +550,18 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 	int *style_value = malloc(sizeof(int));
 	*style_value = 1;
+	int *img_value = malloc(sizeof(int));
+	*img_value = 1;
 
 	insert__hashmap(block_tag_check, "style", style_value, "-d");
+	insert__hashmap(block_tag_check, "img", img_value, "-d");
 
+	printf("%d\n", current_placed_recommended);
 	for (int compute_title_style = 0; compute_title_style < current_placed_recommended + 1; compute_title_style++) {
 		document_vector_t *curr_doc_vec = recommended_doc_vec_order[compute_title_style];
+		if (!curr_doc_vec) break;
 
+		printf("%s\n", curr_doc_vec->id);
 		db_res *db_doc = db_query(db, "SELECT wiki_page FROM page WHERE id=?", curr_doc_vec->id);
 
 		token_t *token_curr_doc_vec = tokenize('s', (char *) get__hashmap(db_doc->row__data[0], "wiki_page", ""));
@@ -596,8 +604,10 @@ void unique_recommend_v2(req_t req, res_t res) {
 		doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + new_len));
 		char *remove_amp_title = find_and_replace(curr_doc_vec->title, "&amp;", "&");
 
+		printf("add to %s, %s, %s\n", remove_amp_title, image_url, document_intro);
 		sprintf(doc_titles + sizeof(char) * (curr_doc_titles_len - 1),
 			"{\"title\":\"%s\",\"image\":\"%s\",\"descript\":\"%s\"}", remove_amp_title, image_url, document_intro);
+		printf("\n\nadded: %s\n", doc_titles);
 
 		free(remove_amp_title);
 		curr_doc_titles_len += new_len;
@@ -608,7 +618,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 		free(document_intro_len);
 		free(document_intro);
-        destroy_token(token_curr_doc_vec);
+	        destroy_token(token_curr_doc_vec);
 	}
 
 	doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + 1));
@@ -624,6 +634,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 	deepdestroy__hashmap(sub_user_doc);
 	destroy_cluster(user_cluster_wrapped, 1);
 
+	printf("%s\n", doc_titles);
 	res_end(res, doc_titles);
 
 	free(doc_titles);
