@@ -482,55 +482,57 @@ void unique_recommend_v2(req_t req, res_t res) {
 	matrix_free(A);
 	vector_free(y);
 
-	if (linreg_weight) {
-	struct vector *w = linreg_weight->beta;
-
-	// use weights in w to calculate a ranking scheme for the returned 5 best documents
 	int current_placed_recommended = 0;
 	double *recommended_doc_vec_ranks = malloc(sizeof(double) * RECOMMENDER_DOC_NUMBER);
 	memset(recommended_doc_vec_ranks, 0, sizeof(double) * RECOMMENDER_DOC_NUMBER);
 
 	document_vector_t **recommended_doc_vec_order = malloc(sizeof(document_vector_t *) * RECOMMENDER_DOC_NUMBER);
-	for (int set_mem = 0; set_mem < RECOMMENDER_DOC_NUMBER; set_mem++)
-		recommended_doc_vec_order[set_mem] = NULL;
-
-	for (s_pq_node_t *curr_doc_vec = closest_doc_vector->min; curr_doc_vec;) {
-		document_vector_t *cdv = (document_vector_t *) curr_doc_vec->payload;
-
-		double *doc_vec_key = malloc(sizeof(double) * *real_user_words_len);
-
-		for (int get_key = 0; get_key < *real_user_words_len; get_key++) {
-			float *doc_term_freq = (float *) get__hashmap(cdv->map, user_words_top50[get_key], "");
-
-			doc_vec_key[get_key] = doc_term_freq ? *doc_term_freq : 0;
-		}
-
-		struct vector *doc_v = vector_from_array(doc_vec_key, *real_user_words_len);
-
-		double resultant_y = vector_dot_product(doc_v, w);
-		vector_free(doc_v);
-
-		// find position in recommended_doc_vec_ranks and recommended_doc_vec_order
-		// for new document based on the weight
-		int document_placement;
-		for (document_placement = 0; document_placement < current_placed_recommended; document_placement++) {
-			if (resultant_y > recommended_doc_vec_ranks[document_placement])
-				break;
-		}
-
-		// based on document_placement, splice in the new document:
-		double rank_buffer; document_vector_t *doc_vec_buffer;
-		for (document_placement; document_placement < current_placed_recommended; document_placement++) {
-			rank_buffer = recommended_doc_vec_ranks[document_placement];
-			recommended_doc_vec_ranks[document_placement] = resultant_y;
-
-			doc_vec_buffer = recommended_doc_vec_order[document_placement];
-			recommended_doc_vec_order[document_placement] = cdv;
-		}
-
-		current_placed_recommended++;
+	int set_mem = 0;
+	for (s_pq_node_t *curr_doc_vec = closest_doc_vector->min; curr_doc_vec; curr_doc_vec = curr_doc_vec->next) {
+		recommended_doc_vec_order[set_mem] = (document_vector_t *) curr_doc_vec->payload;
+		set_mem++;
 	}
 
+	if (linreg_weight) {
+		struct vector *w = linreg_weight->beta;
+
+		// use weights in w to calculate a ranking scheme for the returned 5 best documents
+		for (s_pq_node_t *curr_doc_vec = closest_doc_vector->min; curr_doc_vec;) {
+			document_vector_t *cdv = (document_vector_t *) curr_doc_vec->payload;
+
+			double *doc_vec_key = malloc(sizeof(double) * *real_user_words_len);
+
+			for (int get_key = 0; get_key < *real_user_words_len; get_key++) {
+				float *doc_term_freq = (float *) get__hashmap(cdv->map, user_words_top50[get_key], "");
+
+				doc_vec_key[get_key] = doc_term_freq ? *doc_term_freq : 0;
+			}
+
+			struct vector *doc_v = vector_from_array(doc_vec_key, *real_user_words_len);
+
+			double resultant_y = vector_dot_product(doc_v, w);
+			vector_free(doc_v);
+
+			// find position in recommended_doc_vec_ranks and recommended_doc_vec_order
+			// for new document based on the weight
+			int document_placement;
+			for (document_placement = 0; document_placement < current_placed_recommended; document_placement++) {
+				if (resultant_y > recommended_doc_vec_ranks[document_placement])
+					break;
+			}
+
+			// based on document_placement, splice in the new document:
+			double rank_buffer; document_vector_t *doc_vec_buffer;
+			for (document_placement; document_placement < current_placed_recommended; document_placement++) {
+				rank_buffer = recommended_doc_vec_ranks[document_placement];
+				recommended_doc_vec_ranks[document_placement] = resultant_y;
+
+				doc_vec_buffer = recommended_doc_vec_order[document_placement];
+				recommended_doc_vec_order[document_placement] = cdv;
+			}
+
+			current_placed_recommended++;
+		}
 	}
 
 	free(recommended_doc_vec_ranks);
