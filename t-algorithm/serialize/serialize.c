@@ -63,21 +63,27 @@ int is_m(void *tf, void *extra) {
 	so bring mutex attr with them
 */
 int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
-	token_t *full_page, char **ID, document_vector_t *opt_doc, float frequency_scalar) {
+	yomu_t *full_page, char **ID, document_vector_t *opt_doc, float frequency_scalar) {
 	int total_bag_size = 0;
 
 	// create title page:
 	// get ID
-	int *ID_len = malloc(sizeof(int));
-	*ID = token_read_all_data(grab_token_by_tag(full_page, "id"), ID_len, NULL, NULL);
+	yomu_t **id_tokens = yomu_f.children(full_page, "id", NULL);
+	yomu_t *singleton_id = yomu_f.merge(1, id_tokens);
+	*ID = yomu_f.read(singleton_id, "");
+	int ID_len = strlen(*ID);
 	if (opt_doc)
 		opt_doc->id = *ID;
 
-	total_bag_size += *ID_len - 1;
+	total_bag_size += ID_len - 1;
+
+	free(id_tokens);
+	yomu_f.destroy(singleton_id);
 
 	// get title
-	int *title_len = malloc(sizeof(int));
-	char *title = token_read_all_data(grab_token_by_tag(full_page, "title"), title_len, NULL, NULL);
+	yomu_t **title_tokens = yomu_f.children(full_page, "title", NULL);
+	yomu_t *singleton_title = yomu_f.merge(1, title_tokens);
+	char *title = yomu_f.read(singleton_title, "");
 	if (opt_doc)
 		opt_doc->title = title;
 
@@ -87,32 +93,25 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 	fputs(":", title_fp->runner);
 	fputs(title, title_fp->runner);
 
-	free(title_len);
+	free(title_tokens);
+	yomu_f.destroy(singleton_title);
+
 	free(title);
 
 	// grab full page data
-	int *page_data_len = malloc(sizeof(int)), *word_number_max = malloc(sizeof(int));
-	token_t *page_token = grab_token_by_tag(full_page, "text");
+	int *word_number_max = malloc(sizeof(int));
+	yomu_t **page_tokens = yomu_f.children(full_page, "text", NULL);
+	yomu_t *page_token = yomu_f.merge(1, page_tokens);
+	free(page_tokens);
 
-	// setup a hashmap that will check for blocked tokens:
-	hashmap *block_tag_check = make__hashmap(0, NULL, destroy_hashmap_val);
+	char *token_page_data = yomu_f.read(page_token, "-d-m", "!style");
 
-	// insert any blocked tags (currently just <style>)
-	int *style_value = malloc(sizeof(int));
-	*style_value = 1;
-	int *a_tag_value = malloc(sizeof(int));
-	*a_tag_value = 1;
-	insert__hashmap(block_tag_check, "style", style_value, "-d");
-	insert__hashmap(block_tag_check, "a", a_tag_value, "-d");
-	char *token_page_data = token_read_all_data(page_token, page_data_len, block_tag_check, is_block);
+	yomu_f.destroy(page_token);
 
 	// create an int array so we can know the length of each char *
 	int *phrase_len = malloc(sizeof(int));
 	char **full_page_data = split_string(token_page_data, ' ', word_number_max, "-l", &phrase_len);
 
-	deepdestroy__hashmap(block_tag_check);
-
-	free(page_data_len);
 	free(token_page_data);
 
 	int sum_of_squares = 0; // calculate sum of squares
@@ -193,7 +192,7 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 		// update full_rep
 		// ID,freq|
 		int freq_len = (int) log10(key_freq) + 3;
-		int length = *ID_len + freq_len;
+		int length = ID_len + freq_len;
 
 		// make sure char has enough space
 		while (m_val->full_rep_index + length + 1 >= m_val->max_full_rep) {
@@ -212,7 +211,6 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 
 	free(keys);
 	free(key_len);
-	free(ID_len);
 
 	free(full_page_data);
 

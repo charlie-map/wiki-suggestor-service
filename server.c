@@ -9,7 +9,7 @@
 // add connections to t-algorithm:
 #include "t-algorithm/serialize/serialize.h"
 #include "t-algorithm/serialize/vecrep.h"
-#include "t-algorithm/serialize/token.h"
+#include "t-algorithm/serialize/yomu.h"
 #include "t-algorithm/nearest-neighbor/heap.h"
 #include "t-algorithm/nearest-neighbor/kd-tree.h"
 #include "t-algorithm/nearest-neighbor/k-means.h"
@@ -68,6 +68,7 @@ void unique_recommend_v2(req_t req, res_t res);
 
 int main() {
 	teru_t app = teru();
+	yomu_f.init();
 
 	app_post(app, "/nn", nearest_neighbor);
 	app_post(app, "/ur", unique_recommend_v2);
@@ -153,6 +154,7 @@ int main() {
 
 	trie_destroy(stopword_trie);
 	mysql_close(db);
+	yomu_f.close();
 
 	return 0;
 }
@@ -185,7 +187,7 @@ void nearest_neighbor(req_t req, res_t res) {
 
 		sprintf(full_page, "<page>\n<id>%s</id>\n<title>%s</title>\n<text>%s</text>\n</page>", curr_docID, page_title, page_text);
 
-		token_t *token_wiki_page = tokenize('s',full_page);
+		yomu_t *token_wiki_page = yomu_f.parse(full_page);
 
 		curr_doc = create_document_vector(curr_docID, page_title, 0);
 
@@ -198,6 +200,7 @@ void nearest_neighbor(req_t req, res_t res) {
 		ID = resize_array(ID, ID_len, ID_index, sizeof(char *));
 
 		pthread_mutex_unlock(&ID_mutex);
+		yomu_f.destroy(token_wiki_page);
 
 		// curr doc now holds all the data which the next steps need
 	}
@@ -230,10 +233,10 @@ void nearest_neighbor(req_t req, res_t res) {
 
 	char *page_name_tag = (char *) get__hashmap(db_r->row__data[0], "page_name", "");
 
-	token_t *page_token = tokenize('s', page_name_tag);
+	yomu_t *page_token = yomu_f.parse(page_name_tag);
 
 	int *page_name_len = malloc(sizeof(int));
-	char *page_name_pre_find = token_read_all_data(page_token, page_name_len, NULL, NULL);
+	char *page_name_pre_find = yomu_f.read(page_token, "");
 	char *page_name = find_and_replace(page_name_pre_find, "&amp;", "&");
 
 	free(page_name_pre_find);
@@ -245,7 +248,7 @@ void nearest_neighbor(req_t req, res_t res) {
 	free(dimension_charset);
 	free(cluster_docs);
 
-	destroy_token(page_token);
+	yomu_f.destroy(page_token);
 	kdtree_destroy(cluster_rep);
 	deepdestroy__hashmap(closest_cluster_dimensions);
 	db_res_destroy(db_r);
@@ -253,8 +256,8 @@ void nearest_neighbor(req_t req, res_t res) {
 	return;
 }
 
-int p_tag_match(token_t *t) {
-	return token_has_classname(t, "mw-empty-elt") ? 0 : 1;
+int p_tag_match(yomu_t *t) {
+	return yomu_f.hasClass(t, "mw-empty-elt") ? 0 : 1;
 }
 
 float compute_p_value(int vote, float vote_time, float focus_time, float avvt, float avft) {
@@ -412,7 +415,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 			sprintf(full_page, "<page>\n<id>%s</id>\n<title>%s</title>\n<text>%s</text>\n</page>", page_id, page_title, page_text);
 
-			token_t *token_wiki_page = tokenize('s',full_page);
+			yomu_t *token_wiki_page = yomu_f.parse(full_page);
 
 			full_document_vectors[copy_document_vector] = create_document_vector(page_id, page_title, 0);
 
@@ -425,6 +428,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 			ID = resize_array(ID, ID_len, ID_index, sizeof(char *));
 
 			pthread_mutex_unlock(&ID_mutex);
+			yomu_f.destroy(token_wiki_page);
 		}
 
 		insert__hashmap(sub_user_doc, page_id, full_document_vectors[copy_document_vector], "", compareCharKey, NULL);
@@ -564,23 +568,36 @@ void unique_recommend_v2(req_t req, res_t res) {
 		printf("%s\n", curr_doc_vec->id);
 		db_res *db_doc = db_query(db, "SELECT wiki_page FROM page WHERE id=?", curr_doc_vec->id);
 
-		token_t *token_curr_doc_vec = tokenize('s', (char *) get__hashmap(db_doc->row__data[0], "wiki_page", ""));
+		yomu_t *token_curr_doc_vec = yomu_f.parse((char *) get__hashmap(db_doc->row__data[0], "wiki_page", ""));
 
 		db_res_destroy(db_doc);
 		// a couple of data items we can grab:
 		// first image we encounter
-		token_t *get_first_image = grab_token_by_tag_maxsearch(token_curr_doc_vec, "img", 20);
-		char *image_url = get_first_image ? token_attr(get_first_image, "src") + sizeof(char) * 2 : "";
+		int *image_token_len = malloc(sizeof(int));
+		yomu_t **images = yomu_f.find(token_curr_doc_vec, "img", image_token_len);
+		// look for first occurrence of an image with the class "thumbimage"
+		int find_thumb;
+		for (find_thumb = 0; find_thumb < *image_token_len; find_thumb++)
+			if (yomu_f.hasClass(images[find_thumb], "thumbimage"))
+				break;
+		yomu_t *get_first_image = *image_token_len == 0 ? NULL : images[find_thumb];
+		
+		char *image_url = get_first_image ? yomu_f.attr.get(get_first_image, "src") + sizeof(char) * 2 : "";
 		// first couple blips of text within first p tag in div.mw-parser-output
+		free(images);
+		free(image_token_len);
 
-		token_t *get_mw_parser_output = grab_token_by_classname(token_curr_doc_vec, "mw-parser-output");
+		int *p_tag_len = malloc(sizeof(int));
+		yomu_t **p_yomu = yomu_f.find(token_curr_doc_vec, ".mw-parser-output p", p_tag_len);
 		// then select p tags, (maybe look at first couple?)
 		// need a way to selectively choose if skips should occur
-		int *document_intro_len = malloc(sizeof(int));
-		token_t *tag_match = grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match);
-		char *document_intro_pre = token_read_all_data(grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match), document_intro_len, block_tag_check, is_block);
+		char *document_intro_pre = yomu_f.read(p_yomu[0], "");
+		
+		free(p_yomu);
+		free(p_tag_len);
+
 		char *document_intro;
-		if (*document_intro_len) {
+		if (document_intro_pre) {
 			char *document_intro_fix_quote = find_and_replace(document_intro_pre, "\"", "&ldquo;");
 			char *document_intro_fix_space = find_and_replace(document_intro_fix_quote, "&nbsp;", " ");
 			char *document_intro_fix_tab = find_and_replace(document_intro_fix_space, "\t", " ");
@@ -616,9 +633,8 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 		doc_titles[curr_doc_titles_len - 1] = '\0';
 
-		free(document_intro_len);
 		free(document_intro);
-	        destroy_token(token_curr_doc_vec);
+		yomu_f.destroy(token_curr_doc_vec);
 	}
 
 	doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + 1));

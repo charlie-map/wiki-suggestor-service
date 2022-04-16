@@ -5,7 +5,7 @@
 #include <math.h>
 
 #include "vecrep.h"
-#include "token.h"
+#include "yomu.h"
 #include "../utils/hashmap.h"
 
 #define HOST getenv("WIKIREAD_HOST")
@@ -252,7 +252,7 @@ void *data_read(void *meta_ptr) {
 
 		// printf("CHECK: %s\n", res_body(wiki_page));
 		// parse the wiki data and write to the bag of words
-		token_t *new_wiki_page_token = tokenize('s', res_body(wiki_page));
+		yomu_t *new_wiki_page_token = yomu_f.parse(res_body(wiki_page));
 
 		pthread_mutex_lock(&(ser_pt->term_freq->mutex));
 		int new_doc_length = token_to_terms(ser_pt->term_freq->runner, ser_pt->title_writer, stopword_trie, new_wiki_page_token, &all_IDs[read_body], NULL, 1);
@@ -264,7 +264,7 @@ void *data_read(void *meta_ptr) {
 
 		pthread_mutex_unlock(&(ser_pt->term_freq->mutex));
 
-		destroy_token(new_wiki_page_token);
+		yomu_f.destroy(new_wiki_page_token);
 		res_destroy(wiki_page);
 
 		free(array_body[read_body]);

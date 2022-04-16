@@ -2,7 +2,7 @@
 #define __SERIALIZE_L__
 
 #include "trie.h"
-#include "token.h"
+#include "yomu.h"
 #include "../utils/hashmap.h"
 #include "../nearest-neighbor/k-means.h"
 #include "../nearest-neighbor/document-vector.h"
@@ -33,7 +33,7 @@ int delimeter_check(char curr_char, char *delims);
 
 void *is_block(void *hmap, char *tag);
 int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
-	token_t *full_page, char **ID, document_vector_t *opt_doc, float frequency_scalar);
+	yomu_t *full_page, char **ID, document_vector_t *opt_doc, float frequency_scalar);
 
 void destroy_hashmap_val(void *ptr);
 
