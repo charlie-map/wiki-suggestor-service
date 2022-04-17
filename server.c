@@ -572,8 +572,6 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 		yomu_t *token_curr_doc_vec = yomu_f.parse((char *) get__hashmap(db_doc->row__data[0], "wiki_page", ""));
 
-		break;
-
 		db_res_destroy(db_doc);
 		// a couple of data items we can grab:
 		// first image we encounter

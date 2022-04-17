@@ -599,6 +599,9 @@ tag_reader read_tag(yomu_t *parent_tree, FILE *file, char *str_read, char **curr
 	int max_attr_tag_name = 8, attr_tag_name_index = 0;
 	memset(attr_tag_name, '\0', 8);
 	char *attr_tag_value = malloc(sizeof(char) * 8);
+
+	int attr_tag_value_enclose_type = 0; // choose if the attribute value
+		// is wrapped in "" or '', 0 for "", 1 for ''
 	int max_attr_tag_value = 8, attr_tag_value_index = 0;
 	memset(attr_tag_value, '\0', 8);
 
@@ -643,7 +646,8 @@ tag_reader read_tag(yomu_t *parent_tree, FILE *file, char *str_read, char **curr
 				attr_tag_name[attr_tag_name_index] = '\0';
 			}
 		} else {
-			if ((*curr_line)[search_token] == '"' || (*curr_line)[search_token] == '\'') {
+			if ((!attr_tag_value_enclose_type && (*curr_line)[search_token] == '"') ||
+				(attr_tag_value_enclose_type && (*curr_line)[search_token] == '\'')) {
 				if (start_attr_value) {
 					// add to the token
 					char *tag_name = malloc(sizeof(char) * (attr_tag_name_index + 1));
@@ -661,8 +665,10 @@ tag_reader read_tag(yomu_t *parent_tree, FILE *file, char *str_read, char **curr
 
 					memset(attr_tag_value, '\0', max_attr_tag_value * sizeof(char));
 					memset(attr_tag_name, '\0', max_attr_tag_name * sizeof(char));
-				} else
+				} else {
 					start_attr_value = 1;
+					attr_tag_value_enclose_type = (*curr_line)[search_token] == '\'';
+				}
 
 				search_token++;
 				continue;
@@ -683,12 +689,10 @@ tag_reader read_tag(yomu_t *parent_tree, FILE *file, char *str_read, char **curr
 	}
 
 	if (attr_tag_name_index > 0) {
-		printf("%s\n", str_read);
 		char *tag_name = malloc(sizeof(char) * (attr_tag_name_index + 1));
 		strcpy(tag_name, attr_tag_name);
 
 		char *attr = NULL;
-		printf("%s -- %d\n", tag_name, attr_tag_value_index);
 		if (attr_tag_value_index > 0) {
 			attr = malloc(sizeof(char) * (attr_tag_value_index + 1));
 			strcpy(attr, attr_tag_value);
@@ -749,7 +753,7 @@ int tokenizeMETA(FILE *file, char *str_read, yomu_t *curr_tree) {
 					// add pointer to sub tree within data:
 					add_token_rolling_data(curr_tree, '<');
 					add_token_rolling_data(curr_tree, '>');
-					
+
 					curr_tree = grab_token_children(curr_tree);
 				}
 
