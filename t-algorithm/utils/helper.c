@@ -118,6 +118,7 @@ int delimeter_check(char curr_char, char *delims) {
 		used for deciding if a value should be lowercased
 		use: "-c" to turn this to false (defaults to true)
 */
+	int all_is_range(char _char) { return 1; }
 	int char_is_range(char _char) {
 		return (((int) _char >= 65 && (int) _char <= 90) || ((int) _char >= 97 && (int) _char <= 122));
 	}

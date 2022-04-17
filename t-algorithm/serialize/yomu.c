@@ -96,7 +96,7 @@ int add_token_attribute(yomu_t *token, char *tag, char *attribute) {
 char *token_attr(yomu_t *token, char *attr) {
 	// search for attr
 	int read_attr;
-	for (read_attr = 0; read_attr < token->attr_tag_index; read_attr++) {
+	for (read_attr = 0; read_attr < token->attr_tag_index; read_attr += 2) {
 		if (strcmp(token->attribute[read_attr], attr) == 0)
 			return token->attribute[read_attr + 1];
 	}
@@ -107,7 +107,7 @@ char *token_attr(yomu_t *token, char *attr) {
 int set_attr(yomu_t *y, char *attr, char *new_val) {
 	// search for attr
 	int read_attr;
-	for (read_attr = 0; read_attr < y->attr_tag_index; read_attr++) {
+	for (read_attr = 0; read_attr < y->attr_tag_index; read_attr += 2) {
 		if (strcmp(y->attribute[read_attr], attr) == 0)
 			break;
 	}
@@ -394,7 +394,7 @@ int has_attr_value(char **attribute, int attr_len, char *attr, char *attr_value)
 	attr_pos++;
 
 	int *classlist_len = malloc(sizeof(int));
-	char **classlist = split_string(attribute[attr_pos], ' ', classlist_len, "-c");
+	char **classlist = split_string(attribute[attr_pos], ' ', classlist_len, "-c-r", all_is_range);
 
 	int found_class = 0;
 	for (int check_classlist = 0; check_classlist < *classlist_len; check_classlist++) {

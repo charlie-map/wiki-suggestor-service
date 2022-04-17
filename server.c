@@ -545,20 +545,11 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 	// with sorted recommended_doc_vec_order, loop through them and
 	// compute the data to send to frontend:
-	int curr_doc_titles_len = 256;
-	char *doc_titles = malloc(sizeof(char) * curr_doc_titles_len);
+	int *curr_doc_titles_len = malloc(sizeof(int)), doc_titles_index = 1;
+	*curr_doc_titles_len = 512;
+	char *doc_titles = malloc(sizeof(char) * *curr_doc_titles_len);
 	doc_titles[0] = '[';
 	doc_titles[1] = '\0';
-
-	hashmap *block_tag_check = make__hashmap(0, NULL, destroy_hashmap_val);
-
-	int *style_value = malloc(sizeof(int));
-	*style_value = 1;
-	int *img_value = malloc(sizeof(int));
-	*img_value = 1;
-
-	insert__hashmap(block_tag_check, "style", style_value, "-d");
-	insert__hashmap(block_tag_check, "img", img_value, "-d");
 
 	printf("%d\n", current_placed_recommended);
 	for (int compute_title_style = 0; compute_title_style < current_placed_recommended + 1; compute_title_style++) {
@@ -589,10 +580,21 @@ void unique_recommend_v2(req_t req, res_t res) {
 		free(image_token_len);
 
 		int *p_tag_len = malloc(sizeof(int));
-		yomu_t **p_yomu = yomu_f.find(token_curr_doc_vec, ".mw-parser-output p", p_tag_len);
+		yomu_t **p_yomu = yomu_f.find(token_curr_doc_vec, "p", p_tag_len);
 		// then select p tags, (maybe look at first couple?)
 		// need a way to selectively choose if skips should occur
-		char *document_intro_pre = yomu_f.read(p_yomu[0], "");
+		int choose_p_tag;
+		for (choose_p_tag = 0; choose_p_tag < *p_tag_len; choose_p_tag++)
+			if (!yomu_f.hasClass(p_yomu[choose_p_tag], "mw-empty-elt"))
+				break;
+
+		char *document_intro_pre;
+		if (choose_p_tag < *p_tag_len)
+			document_intro_pre = yomu_f.read(p_yomu[choose_p_tag], "");
+		else {
+			document_intro_pre = malloc(sizeof(char) * 27);
+			strcpy(document_intro_pre, "Description not available.");
+		}
 
 		free(p_yomu);
 		free(p_tag_len);
@@ -602,14 +604,20 @@ void unique_recommend_v2(req_t req, res_t res) {
 			char *document_intro_fix_quote = find_and_replace(document_intro_pre, "\"", "&ldquo;");
 			char *document_intro_fix_space = find_and_replace(document_intro_fix_quote, "&nbsp;", " ");
 			char *document_intro_fix_tab = find_and_replace(document_intro_fix_space, "\t", " ");
+			char *document_intro_fix_newline = find_and_replace(document_intro_fix_tab, "\n", " ");
+			char *document_intro_fix_backslash = find_and_replace(document_intro_fix_newline, "\\", " ");
+
 			free(document_intro_fix_quote);
 			free(document_intro_fix_space);
+			free(document_intro_fix_tab);
+			free(document_intro_fix_newline);
+
 			char *en_dash = malloc(sizeof(char) * 2);
 			sprintf(en_dash, "%c", 150);
-			document_intro = find_and_replace(document_intro_fix_tab, en_dash, "-");
+			document_intro = find_and_replace(document_intro_fix_backslash, en_dash, "-");
 
 			free(en_dash);
-			free(document_intro_fix_tab);
+			free(document_intro_fix_backslash);
 		} else {
 			document_intro = malloc(sizeof(char) * 22);
 			strcpy(document_intro, "No description found.");
@@ -619,28 +627,27 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 		int new_len = strlen(curr_doc_vec->title) + strlen(image_url) + strlen(document_intro) + 38;
 
-		doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + new_len));
+		doc_titles = resize_array(doc_titles, curr_doc_titles_len, doc_titles_index + new_len, sizeof(char));
 		char *remove_amp_title = find_and_replace(curr_doc_vec->title, "&amp;", "&");
 
-		printf("add to %s, %s, %s\n", remove_amp_title, image_url, document_intro);
-		sprintf(doc_titles + sizeof(char) * (curr_doc_titles_len - 1),
+		sprintf(doc_titles + sizeof(char) * doc_titles_index,
 			"{\"title\":\"%s\",\"image\":\"%s\",\"descript\":\"%s\"}", remove_amp_title, image_url, document_intro);
-		printf("\n\nadded: %s\n", doc_titles);
 
 		free(remove_amp_title);
-		curr_doc_titles_len += new_len;
+		doc_titles_index += new_len;
 		if (compute_title_style < current_placed_recommended)
-			doc_titles[curr_doc_titles_len - 2] = ',';
+			doc_titles[doc_titles_index - 1] = ',';
 
-		doc_titles[curr_doc_titles_len - 1] = '\0';
+		doc_titles[doc_titles_index] = '\0';
 
 		free(document_intro);
 		yomu_f.destroy(token_curr_doc_vec);
 	}
 
-	doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + 1));
+	doc_titles = resize_array(doc_titles, curr_doc_titles_len, doc_titles_index + 1, sizeof(char));
 	strcat(doc_titles, "]");
 
+	free(curr_doc_titles_len);
 	free(full_document_vectors);
 	free(closest_doc_vector);
 	free(user_doc_vec);
