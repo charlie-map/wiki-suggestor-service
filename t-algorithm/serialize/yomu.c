@@ -1,4 +1,3 @@
-#include <time.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -62,7 +61,6 @@ yomu_t *create_token(char *tag, yomu_t *parent, int deep_copy) {
 
 	return new_token;
 }
-
 
 int add_token_rolling_data(yomu_t *token, char data) {
 	token->data[token->data_index] = data;
@@ -625,7 +623,8 @@ tag_reader read_tag(yomu_t *parent_tree, FILE *file, char *str_read, char **curr
 
 				search_token++;
 				continue;
-			} else if (attr_tag_name_index > 0 && (*curr_line)[search_token - 1] == ' ') {
+			} else if (attr_tag_name_index > 0 && (*curr_line)[search_token] != ' ' &&
+				(*curr_line)[search_token - 1] == ' ') {
 				// this means there was no attr value, so add this
 				// with a NULL value and move into the next one
 				char *tag_name = malloc(sizeof(char) * (attr_tag_name_index + 1));
@@ -637,10 +636,12 @@ tag_reader read_tag(yomu_t *parent_tree, FILE *file, char *str_read, char **curr
 				continue;
 			}
 
-			attr_tag_name[attr_tag_name_index++] = (*curr_line)[search_token];
+			if ((*curr_line)[search_token] != ' ') {
+				attr_tag_name[attr_tag_name_index++] = (*curr_line)[search_token];
 
-			attr_tag_name = resize_array(attr_tag_name, &max_attr_tag_name, attr_tag_name_index, sizeof(char));
-			attr_tag_name[attr_tag_name_index] = '\0';
+				attr_tag_name = resize_array(attr_tag_name, &max_attr_tag_name, attr_tag_name_index, sizeof(char));
+				attr_tag_name[attr_tag_name_index] = '\0';
+			}
 		} else {
 			if ((*curr_line)[search_token] == '"' || (*curr_line)[search_token] == '\'') {
 				if (start_attr_value) {
@@ -653,6 +654,7 @@ tag_reader read_tag(yomu_t *parent_tree, FILE *file, char *str_read, char **curr
 					add_token_attribute(new_tree, tag_name, attr);
 
 					attr_tag_name_index = 0;
+					attr_tag_value_index = 0;
 
 					read_tag = 1;
 					start_attr_value = 0;
@@ -678,6 +680,20 @@ tag_reader read_tag(yomu_t *parent_tree, FILE *file, char *str_read, char **curr
 		}
 
 		search_token++;
+	}
+
+	if (attr_tag_name_index > 0) {
+		char *tag_name = malloc(sizeof(char) * (attr_tag_name_index + 1));
+		strcpy(tag_name, attr_tag_name);
+
+		char *attr = NULL;
+		printf("%s -- %d\n", tag_name, attr_tag_value_index);
+		if (attr_tag_value_index > 0) {
+			attr = malloc(sizeof(char) * (attr_tag_value_index + 1));
+			strcpy(attr, attr_tag_value);
+		}
+
+		add_token_attribute(new_tree, tag_name, attr);
 	}
 
 	free(attr_tag_name);
