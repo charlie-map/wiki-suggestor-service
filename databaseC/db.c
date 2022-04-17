@@ -126,7 +126,7 @@ db_res *db_query(MYSQL *conn, char *query, ...) {
 			char *row_data = malloc(sizeof(char) * (res->lengths[read_header] + 1));
 			strcpy(row_data, row[read_header]);
 
-			insert__hashmap(data->row__data[data->row_count], data->headers[read_header], row_data, "", compareCharKey, NULL);
+			insert__hashmap(data->row__data[data->row_count], data->headers[read_header], row_data, "", NULL, compareCharKey, NULL);
 		}
 
 		data->row_count++;

@@ -38,12 +38,12 @@ hashmap *infer_load() {
 	if_t *image_png = createInferenceLoad("image/png", 1);
 	if_t *image_jpg = createInferenceLoad("image/jpg", 1);
 
-	insert__hashmap(load_map, "txt", text_plain, "", compareCharKey, NULL);
-	insert__hashmap(load_map, "html", text_html, "", compareCharKey, NULL);
-	insert__hashmap(load_map, "css", text_css, "", compareCharKey, NULL);
-	insert__hashmap(load_map, "js", text_javascript, "", compareCharKey, NULL);
-	insert__hashmap(load_map, "png", image_png, "", compareCharKey, NULL);
-	insert__hashmap(load_map, "jpg", image_jpg, "", compareCharKey, NULL);
+	insert__hashmap(load_map, "txt", text_plain, "", NULL, compareCharKey, NULL);
+	insert__hashmap(load_map, "html", text_html, "", NULL, compareCharKey, NULL);
+	insert__hashmap(load_map, "css", text_css, "", NULL, compareCharKey, NULL);
+	insert__hashmap(load_map, "js", text_javascript, "", NULL, compareCharKey, NULL);
+	insert__hashmap(load_map, "png", image_png, "", NULL, compareCharKey, NULL);
+	insert__hashmap(load_map, "jpg", image_jpg, "", NULL, compareCharKey, NULL);
 
 	return load_map;
 }

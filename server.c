@@ -294,7 +294,7 @@ char **compute_best_words(hashmap *user_doc, hashmap *user_term_freq, int *final
 			} else {
 				float *new_term_freq = malloc(sizeof(float));
 				*new_term_freq = 1.0 + (doc_v ? *doc_v : 0);
-				insert__hashmap(user_term_freq, doc_key[doc_p], new_term_freq, "", compareCharKey, NULL);
+				insert__hashmap(user_term_freq, doc_key[doc_p], new_term_freq, "", NULL, compareCharKey, NULL);
 			}
 		}
 
@@ -431,7 +431,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 			yomu_f.destroy(token_wiki_page);
 		}
 
-		insert__hashmap(sub_user_doc, page_id, full_document_vectors[copy_document_vector], "", compareCharKey, NULL);
+		insert__hashmap(sub_user_doc, page_id, full_document_vectors[copy_document_vector], "", NULL, compareCharKey, NULL);
 	}
 
 	// otherwise we can move forward to computing a centroid
@@ -720,10 +720,10 @@ hashmap *build_dimensions(char ***dimension_groups, void *curr_vector_group, cha
 	hashmap *dimensions = make__hashmap(0, NULL, NULL);
 
 	for (int insert_word = 0; insert_word < *key_length - 1; insert_word++) {
-		insert__hashmap(dimensions, (*dimension_groups)[insert_word], (*dimension_groups)[insert_word + 1], "", compareCharKey, NULL);
+		insert__hashmap(dimensions, (*dimension_groups)[insert_word], (*dimension_groups)[insert_word + 1], "", NULL, compareCharKey, NULL);
 	}
 
-	insert__hashmap(dimensions, (*dimension_groups)[*key_length - 1], (*dimension_groups)[0], "", compareCharKey, NULL);
+	insert__hashmap(dimensions, (*dimension_groups)[*key_length - 1], (*dimension_groups)[0], "", NULL, compareCharKey, NULL);
 
 	free(key_length);
 	return dimensions;

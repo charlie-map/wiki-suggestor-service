@@ -793,19 +793,19 @@ hashmap *set_forbidden_close_tags() {
 	char *param_f = malloc(sizeof(char) * 6); strcpy(param_f, "param");
 
 	// insert into fct:
-	insert__hashmap(fct, img_f, forbidden_true[0], "", compareCharKey, destroyCharKey);
-	insert__hashmap(fct, input_f, forbidden_true[1], "", compareCharKey, destroyCharKey);
-	insert__hashmap(fct, br_f, forbidden_true[2], "", compareCharKey, destroyCharKey);
-	insert__hashmap(fct, hr_f, forbidden_true[3], "", compareCharKey, destroyCharKey);
-	insert__hashmap(fct, frame_f, forbidden_true[4], "", compareCharKey, destroyCharKey);
-	insert__hashmap(fct, area_f, forbidden_true[5], "", compareCharKey, destroyCharKey);
-	insert__hashmap(fct, base_f, forbidden_true[6], "", compareCharKey, destroyCharKey);
-	insert__hashmap(fct, basefont_f, forbidden_true[7], "", compareCharKey, destroyCharKey);
-	insert__hashmap(fct, col_f, forbidden_true[8], "", compareCharKey, destroyCharKey);
-	insert__hashmap(fct, isindex_f, forbidden_true[9], "", compareCharKey, destroyCharKey);
-	insert__hashmap(fct, link_f, forbidden_true[10], "", compareCharKey, destroyCharKey);
-	insert__hashmap(fct, meta_f, forbidden_true[11], "", compareCharKey, destroyCharKey);
-	insert__hashmap(fct, param_f, forbidden_true[12], "", compareCharKey, destroyCharKey);
+	insert__hashmap(fct, img_f, forbidden_true[0], "", NULL, compareCharKey, destroyCharKey);
+	insert__hashmap(fct, input_f, forbidden_true[1], "", NULL, compareCharKey, destroyCharKey);
+	insert__hashmap(fct, br_f, forbidden_true[2], "", NULL, compareCharKey, destroyCharKey);
+	insert__hashmap(fct, hr_f, forbidden_true[3], "", NULL, compareCharKey, destroyCharKey);
+	insert__hashmap(fct, frame_f, forbidden_true[4], "", NULL, compareCharKey, destroyCharKey);
+	insert__hashmap(fct, area_f, forbidden_true[5], "", NULL, compareCharKey, destroyCharKey);
+	insert__hashmap(fct, base_f, forbidden_true[6], "", NULL, compareCharKey, destroyCharKey);
+	insert__hashmap(fct, basefont_f, forbidden_true[7], "", NULL, compareCharKey, destroyCharKey);
+	insert__hashmap(fct, col_f, forbidden_true[8], "", NULL, compareCharKey, destroyCharKey);
+	insert__hashmap(fct, isindex_f, forbidden_true[9], "", NULL, compareCharKey, destroyCharKey);
+	insert__hashmap(fct, link_f, forbidden_true[10], "", NULL, compareCharKey, destroyCharKey);
+	insert__hashmap(fct, meta_f, forbidden_true[11], "", NULL, compareCharKey, destroyCharKey);
+	insert__hashmap(fct, param_f, forbidden_true[12], "", NULL, compareCharKey, destroyCharKey);
 
 	free(forbidden_true);
 

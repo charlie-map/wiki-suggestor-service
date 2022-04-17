@@ -40,7 +40,7 @@ float cosine_similarity(hashmap *doc, float doc_sqrt_mag, hashmap *centroid, flo
 		void *pre_doc_word_tfidf = get__hashmap(centroid, key, "");
 		if (!pre_doc_word_tfidf) { // insert into centroid with new data
 			cluster_centroid_data *new_centroid_data = create_cluster_centroid_data(0.0);
-			insert__hashmap(centroid, key, new_centroid_data, "", compareCharKey, NULL);
+			insert__hashmap(centroid, key, new_centroid_data, "", NULL, compareCharKey, NULL);
 		}
 
 		float doc_word_tfidf = pre_doc_word_tfidf ? *(float *) pre_doc_word_tfidf : 0.0;
@@ -298,7 +298,7 @@ int copy__hashmap(hashmap* m1, hashmap* m2) {
 
 		cluster_centroid_data *new_ccd = create_cluster_centroid_data(m1_value);
 
-		insert__hashmap(m1, m2_words[cp_value], new_ccd, "", compareCharKey, NULL);
+		insert__hashmap(m1, m2_words[cp_value], new_ccd, "", NULL, compareCharKey, NULL);
 	}
 
 	free(m2_value_len);

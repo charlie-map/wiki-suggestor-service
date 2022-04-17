@@ -164,7 +164,7 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 					float *new_opt_map_value = malloc(sizeof(float));
 					*new_opt_map_value = 1 * frequency_scalar;
 
-					insert__hashmap(opt_doc->map, full_page_data[add_hash], new_opt_map_value, "", compareCharKey, NULL);
+					insert__hashmap(opt_doc->map, full_page_data[add_hash], new_opt_map_value, "", NULL, compareCharKey, NULL);
 				}
 			}
 
@@ -175,7 +175,7 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 
 		tf_t *new_tf = new_tf_t(*ID);
 
-		insert__hashmap(term_freq, full_page_data[add_hash], new_tf, "", compareCharKey, destroyCharKey);
+		insert__hashmap(term_freq, full_page_data[add_hash], new_tf, "", NULL, compareCharKey, destroyCharKey);
 	}
 
 	free(word_number_max);
