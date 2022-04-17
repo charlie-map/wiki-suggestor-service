@@ -683,6 +683,7 @@ tag_reader read_tag(yomu_t *parent_tree, FILE *file, char *str_read, char **curr
 	}
 
 	if (attr_tag_name_index > 0) {
+		printf("%s\n", str_read);
 		char *tag_name = malloc(sizeof(char) * (attr_tag_name_index + 1));
 		strcpy(tag_name, attr_tag_name);
 

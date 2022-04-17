@@ -444,7 +444,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 	user_doc_vec->map = user_cluster->centroid;
 
 	pthread_mutex_lock(&(mutex_doc_vector_kdtree->mutex));
-	s_pq_t *closest_doc_vector = kdtree_search(mutex_doc_vector_kdtree->runner, doc_vector_kdtree_start_dimension, user_doc_vec, RECOMMENDER_DOC_NUMBER, (void **) full_document_vectors, db_r->row_count);
+	s_pq_t *closest_doc_vector = kdtree_search(mutex_doc_vector_kdtree->runner, doc_vector_kdtree_start_dimension, user_doc_vec, RECOMMENDER_DOC_NUMBER, (void **) full_document_vectors, user_votes->row_count);
 	pthread_mutex_unlock(&(mutex_doc_vector_kdtree->mutex));
 
 	// find top 50 words from within the user_cluster to create a ranking
@@ -472,7 +472,9 @@ void unique_recommend_v2(req_t req, res_t res) {
 			float doc_freq = ((tf_t *) get__hashmap(term_freq->runner, user_words_top50[word_p], ""))->doc_freq * 1.0;
 			pthread_mutex_unlock(&term_freq->mutex);
 
-			term_matrix[row_jump + word_p] = doc_term_freq ? (*doc_term_freq == 0 ? 1 : *doc_term_freq * doc_freq) : 0.0;
+			printf("%s -- %1.3f * %1.3f - ", user_words_top50[word_p], doc_term_freq ? *doc_term_freq : 0, doc_freq);
+			term_matrix[row_jump + word_p] = doc_term_freq ? (*doc_term_freq == 0 ? 0.1 * doc_freq : *doc_term_freq * doc_freq) : 0.0;
+			printf("final: %1.3f\n", term_matrix[row_jump + word_p]);
 		}
 	}
 
@@ -569,6 +571,8 @@ void unique_recommend_v2(req_t req, res_t res) {
 		db_res *db_doc = db_query(db, "SELECT wiki_page FROM page WHERE id=?", curr_doc_vec->id);
 
 		yomu_t *token_curr_doc_vec = yomu_f.parse((char *) get__hashmap(db_doc->row__data[0], "wiki_page", ""));
+
+		break;
 
 		db_res_destroy(db_doc);
 		// a couple of data items we can grab:
