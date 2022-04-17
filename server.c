@@ -580,8 +580,9 @@ void unique_recommend_v2(req_t req, res_t res) {
 		for (find_thumb = 0; find_thumb < *image_token_len; find_thumb++)
 			if (yomu_f.hasClass(images[find_thumb], "thumbimage"))
 				break;
-		yomu_t *get_first_image = *image_token_len == 0 ? NULL : images[find_thumb];
-		
+		yomu_t *get_first_image = *image_token_len == 0 ? NULL : find_thumb == *image_token_len ?
+			images[0] : images[find_thumb];
+
 		char *image_url = get_first_image ? yomu_f.attr.get(get_first_image, "src") + sizeof(char) * 2 : "";
 		// first couple blips of text within first p tag in div.mw-parser-output
 		free(images);
@@ -592,7 +593,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 		// then select p tags, (maybe look at first couple?)
 		// need a way to selectively choose if skips should occur
 		char *document_intro_pre = yomu_f.read(p_yomu[0], "");
-		
+
 		free(p_yomu);
 		free(p_tag_len);
 
