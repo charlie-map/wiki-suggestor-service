@@ -772,15 +772,19 @@ int tokenizeMETA(FILE *file, char *str_read, yomu_t *curr_tree) {
 }
 
 // see comment on tokenize for ruleset
-// 1 for file
-// 0 for html
+// 0 for file
+// 1 for html
 int file_or_html_name(char *data) {
+	int has_period = 0;
+
 	for (int check_name = 0; data[check_name]; check_name++) {
+		has_period = has_period || data[check_name] == '.';
+
 		if (data[check_name] == '<' || data[check_name] == '>')
 			return 1;
 	}
 
-	return 0;
+	return !has_period;
 }
 
 hashmap *set_forbidden_close_tags() {

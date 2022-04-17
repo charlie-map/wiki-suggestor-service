@@ -472,12 +472,21 @@ void unique_recommend_v2(req_t req, res_t res) {
 			float doc_freq = ((tf_t *) get__hashmap(term_freq->runner, user_words_top50[word_p], ""))->doc_freq * 1.0;
 			pthread_mutex_unlock(&term_freq->mutex);
 
-			term_matrix[row_jump + word_p] = doc_term_freq ? (*doc_term_freq == 0 ? 1 : *doc_term_freq * doc_freq) : 1.0;
+			term_matrix[row_jump + word_p] = doc_term_freq ? (*doc_term_freq == 0 ? 1 : *doc_term_freq * doc_freq) : 0.0;
 		}
 	}
 
 	deepdestroy__hashmap(user_term_freq);
 	// compute the weight for each term:
+	for (int i = 0; i < user_votes->row_count; i++) {
+		printf("%d: ", i);
+
+		for (int j = 0; j < *real_user_words_len; j++) {
+			printf("%lf - ", term_matrix[i * user_votes->row_count + j]);
+		}
+		printf("\n");
+	}
+
 	struct matrix *A = matrix_from_array(term_matrix, user_votes->row_count, *real_user_words_len);
 	struct vector *y = vector_from_array(resultant_y, user_votes->row_count);
 
