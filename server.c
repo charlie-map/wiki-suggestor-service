@@ -492,6 +492,10 @@ void unique_recommend_v2(req_t req, res_t res) {
 	struct matrix *A = matrix_from_array(term_matrix, user_votes->row_count, *real_user_words_len);
 	struct vector *y = vector_from_array(resultant_y, user_votes->row_count);
 
+	free(term_matrix);
+	free(resultant_y);
+
+	db_res_destroy(user_votes);
 	struct linreg *linreg_weight = linreg_fit(A, y);
 
 	matrix_free(A);
@@ -548,10 +552,14 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 			current_placed_recommended++;
 		}
+
+		linreg_free(linreg_weight);
 	} else {
 		current_placed_recommended = 4;
 	}
 
+	free(real_user_words_len);
+	free(user_words_top50);
 	free(recommended_doc_vec_ranks);
 
 	// with sorted recommended_doc_vec_order, loop through them and
@@ -563,6 +571,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 	doc_titles[1] = '\0';
 
 	printf("%d\n", current_placed_recommended);
+	s_pq_node_t *del_pq_vec = closest_doc_vector->min;
 	for (int compute_title_style = 0; compute_title_style < current_placed_recommended + 1; compute_title_style++) {
 		document_vector_t *curr_doc_vec = recommended_doc_vec_order[compute_title_style];
 		if (!curr_doc_vec) break;
@@ -653,6 +662,11 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 		free(document_intro);
 		yomu_f.destroy(token_curr_doc_vec);
+
+		s_pq_node_t *del_pq_vec_next = del_pq_vec ? del_pq_vec->next : NULL;
+		if (del_pq_vec)
+			free(del_pq_vec);
+		del_pq_vec = del_pq_vec_next;
 	}
 
 	doc_titles = resize_array(doc_titles, curr_doc_titles_len, doc_titles_index + 1, sizeof(char));
@@ -662,6 +676,8 @@ void unique_recommend_v2(req_t req, res_t res) {
 	free(full_document_vectors);
 	free(closest_doc_vector);
 	free(user_doc_vec);
+
+	free(recommended_doc_vec_order);
 
 	db_res_destroy(db_r);
 

@@ -957,9 +957,12 @@ int anti_tag_match(yomu_t *y, char *tag) {
 }
 
 match_t match_create(int (*match)(yomu_t *, char *), char *match_tag) {
+	char *cp_match_tag = malloc(sizeof(char) * (strlen(match_tag) + 1));
+	strcpy(cp_match_tag, match_tag);
+
 	match_t new_match = {
 		.match = match,
-		.match_tag = match_tag
+		.match_tag = cp_match_tag
 	};
 
 	return new_match;
@@ -990,7 +993,7 @@ match_t *create_matches(char *match_param, int *match_param_length) {
 
 	// search through sub_match_params to see which function is needed
 	for (int find_match = 0; find_match < *match_param_length; find_match++) {
-		int reverse_match = sub_match_params[find_match][0] == '!';		
+		int reverse_match = sub_match_params[find_match][0] == '!';
 
 		// check first value in the char * to decide which type we are searching for:
 		if ((reverse_match && sub_match_params[find_match][1] == '*')
@@ -1007,8 +1010,12 @@ match_t *create_matches(char *match_param, int *match_param_length) {
 				reverse_match ? sub_match_params[find_match] + (sizeof(char) * 2) : sub_match_params[find_match] + sizeof(char));
 		else // tag
 			return_matches[find_match] = match_create(reverse_match ? anti_tag_match : tag_match, sub_match_params[find_match]);
+
+		free(sub_match_params[find_match]);
 	}
 
+	free(sub_match_param_length);
+	free(sub_match_params);
 	return return_matches;
 }
 
@@ -1024,6 +1031,7 @@ yomu_t **compute_matches(yomu_t *y, char *match_param, int *length, int depth) {
 	int *yomu_len = malloc(sizeof(int)), *yomu_prev_len = malloc(sizeof(int)), *yomu_buffer_len = malloc(sizeof(int));
 	yomu_t **yomu_match, **yomu_prev = NULL, **yomu_buffer;
 	yomu_match = grab_tokens_by_match(y, matches[0].match, matches[0].match_tag, yomu_len, depth);
+	free(matches[0].match_tag);
 	for (int find_match = 1; depth && find_match < *match_param_length; find_match++) {
 		if (yomu_prev)
 			free(yomu_prev);
@@ -1048,6 +1056,7 @@ yomu_t **compute_matches(yomu_t *y, char *match_param, int *length, int depth) {
 		}
 
 		*yomu_len = yomu_index;
+		free(matches[find_match].match_tag);
 	}
 
 	// copy yomu_len in length

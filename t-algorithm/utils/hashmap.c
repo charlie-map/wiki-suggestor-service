@@ -668,7 +668,7 @@ void printIntKey(void *integer) {
 int compareIntKey(void *integer, void *otherValue) {
 	return *((int *) integer) == *((int *) otherValue);
 }
-void destroyIntKey(void *integer) { /* We can't free that! */ }
+void destroyIntKey(void *integer) { free(integer); }
 
 
 int insert__hashmap(hashmap *hash__m, void *key, void *value, ...) {
