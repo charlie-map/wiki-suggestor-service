@@ -85,15 +85,18 @@ void *heap_peek(heap_t *head) {
 	return head->min ? head->min->payload : NULL;
 }
 
-heap_node *fixConflictNode(heap_node *conflictNode, heap_node *someNode, int *rankSize) {
-
+heap_node *fixConflictNode(heap_t *head, heap_node *conflictNode, heap_node *someNode, int *rankSize) {
 	// define which pointer will be which
-	heap_node *makeChild = conflictNode->weight < someNode->weight ? someNode : conflictNode;
-	heap_node *makeParent = conflictNode->weight < someNode->weight ? conflictNode : someNode;
+	heap_node *makeChild = head->compare(conflictNode->weight, someNode->weight) ? someNode : conflictNode;
+	heap_node *makeParent = head->compare(conflictNode->weight, someNode->weight) ? conflictNode : someNode;
 
 	// have to splice makeChild from root list
 	makeChild->heap__left->heap__right = makeChild->heap__right;
 	makeChild->heap__right->heap__left = makeChild->heap__left;
+
+	// circularly link makeChild
+	makeChild->heap__left = makeChild;
+	makeChild->heap__right = makeChild;
 
 	// insert as child into makeParent
 	// and makeChild parent's pointer makeParent
@@ -103,27 +106,28 @@ heap_node *fixConflictNode(heap_node *conflictNode, heap_node *someNode, int *ra
 		makeParent->child->heap__right = makeChild;
 		makeChild->heap__left = makeParent->child;
 	} else {// make makeChild the makeParent child pointer
-		makeChild->heap__left = makeChild;
-		makeChild->heap__right = makeChild;
 		makeParent->child = makeChild;
 	}
 
 	makeChild->parent = makeParent;
 
+	makeParent->rank++;
 	return makeParent;
 }
 
 // takes in a node and finds the smallest root node:
-heap_node *fixHeap(heap_t *head, heap_node *startNode, int *rankSize, int nodeNumber) {
+int fixHeap(heap_t *head, heap_node *startNode, int *rankSize, int nodeNumber) {
 	heap_node *someNode = startNode ? startNode->heap__right : NULL;
-	heap_node *min = someNode ? someNode : NULL;
+	head->min = NULL;
 
 	// make array of size max rank:
 	int max_deg = ceil(log2(nodeNumber));
 	heap_node *rankarray[max_deg];
-	memset(rankarray, 0, sizeof(rankarray));
+	for (int set_null = 0; set_null < max_deg; set_null++) {
+		rankarray[set_null] = NULL;
+	}
 
-	while (someNode != startNode) {
+	do {
 		// check someNode against rankarray table
 		heap_node *conflictNode = rankarray[someNode->rank];
 		// if there is a value at conflictNode need to combine one to the other
@@ -131,16 +135,16 @@ heap_node *fixHeap(heap_t *head, heap_node *startNode, int *rankSize, int nodeNu
 
 		// used for checking conflicts after altering tree
 		heap_node *finalParent = someNode;
-		heap_node *next_someNode = someNode->heap__right; // temp store value right of someNode
-		while (conflictNode != NULL) {
+		while (conflictNode != NULL && conflictNode != finalParent) {
+			// edge case: conflictNode or parentNode is current min?
+			// set head->min to NULL and reevaluate after
+			if (head->min == conflictNode || head->min == finalParent)
+				head->min = NULL;
 
 			// clear conflictnode from rankarray
 			rankarray[conflictNode->rank] = NULL;
 
-			finalParent = fixConflictNode(conflictNode, finalParent, rankSize);
-
-			// increase parent rank
-			finalParent->rank++;
+			finalParent = fixConflictNode(head, conflictNode, finalParent, rankSize);
 
 			conflictNode = rankarray[finalParent->rank];
 		}
@@ -148,16 +152,17 @@ heap_node *fixHeap(heap_t *head, heap_node *startNode, int *rankSize, int nodeNu
 		// set whatever finalParent->rank equals position in array:
 		rankarray[finalParent->rank] = finalParent;
 
-		if (head->compare(finalParent->weight, min->weight))
-			min = finalParent;
+		if (!head->min || head->compare(finalParent->weight, head->min->weight)) {
+			head->min = finalParent;
+		}
 
-		someNode = next_someNode;
-	}
+		someNode = finalParent->heap__right;
+	} while (someNode != head->min);
 
-	return min;
+	return 0;
 }
 
-void *heap_pop(heap_t *head) {
+void *heap_pop(heap_t *head, int hard_destroy) {
 	if (!head->min) // uhhh
 		return NULL;
 
@@ -186,27 +191,68 @@ void *heap_pop(heap_t *head) {
 
 	// get the old min:
 	heap_node *prevMin = head->min;
+	heap_node *neighbor = prevMin->heap__right;
+        neighbor->heap__left = prevMin->heap__left;
+        neighbor->heap__left->heap__right = neighbor;
+	head->min = prevMin->heap__right;
 
 	// update min
-	if (head->min != head->min->heap__right) {
-		head->min = fixHeap(head, prevMin, &head->maxRank, head->nodeSum); // also finds minimum
+	if (head->min != prevMin) {
+		fixHeap(head, prevMin, &head->maxRank, head->nodeSum); // also finds minimum
 	} else
 		head->min = NULL;
 
 	head->nodeSum--;
 
-	// splice complete,
-	// extract previous min
-	heap_node *neighbor = prevMin->heap__right;
-	neighbor->heap__left = prevMin->heap__left;
-	neighbor->heap__left->heap__right = neighbor;
-
 	// extract payload to return
 	void *prevMinPayload = prevMin->payload;
 	// delete the previous min
-	free(prevMin->weight);
+	if (hard_destroy)
+		free(prevMin->weight);
 	free(prevMin);
 	return prevMinPayload;
+}
+
+int heap_size(heap_t *head) {
+	return head->nodeSum;
+}
+
+int tabs(int n) {
+	for (int i = 0; i < n; i++) {
+		printf("\t");
+	}
+
+	return 0;
+}
+
+int heap_check_size_helper(heap_node *start_node, int depth) {
+	heap_node *next = start_node->heap__right;
+
+	int sum = 0;
+
+	while (next != start_node) {
+		//tabs(depth);
+		//printf("%s\n", (char *) next->payload);
+		sum++;
+
+		if (next->child)
+			sum += heap_check_size_helper(next->child, depth + 1);
+
+		next = next->heap__right;
+	}
+
+	//tabs(depth);
+	//printf("%s\n", (char *) next->payload);
+	if (next->child)
+		sum += heap_check_size_helper(next->child, depth + 1);
+
+	//printf("\n");
+	return sum + 1;
+
+}
+
+int heap_check_size(heap_t *head) {
+	return heap_check_size_helper(head->min, 0);
 }
 
 int heap_decrease_key(heap_t *head, void *key, void *newWeight) {

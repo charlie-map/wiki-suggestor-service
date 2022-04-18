@@ -364,7 +364,7 @@ hashmap *read_headers_client(char *header_str, int *header_end) {
 		// check for a carraige return (\r). This means the newline character is one further along
 		past_lines += attr_index + ((int) header_str[past_lines + attr_index + 2] == 13 ? 3 : 2);
 
-		insert__hashmap(header_map, head_tag, attr_tag, "", compareCharKey, destroyCharKey);
+		insert__hashmap(header_map, head_tag, attr_tag, "", NULL, compareCharKey, destroyCharKey);
 
 		free(head_max);
 		free(attr_max);
@@ -420,7 +420,7 @@ hashmap *read_headers_server(char *header_str, void (*print_key)(void *), int *h
 		// check for a carraige return (\r). This means the newline character is one further along
 		past_lines += attr_index + ((int) header_str[past_lines + attr_index + 2] == 13 ? 3 : 2);
 
-		insert__hashmap(header_map, head_tag, attr_tag, "", compareCharKey, destroyCharKey);
+		insert__hashmap(header_map, head_tag, attr_tag, "", NULL, compareCharKey, destroyCharKey);
 
 		free(head_max);
 		free(attr_max);

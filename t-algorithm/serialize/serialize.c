@@ -63,21 +63,41 @@ int is_m(void *tf, void *extra) {
 	so bring mutex attr with them
 */
 int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
-	token_t *full_page, char **ID, document_vector_t *opt_doc) {
+	yomu_t *full_page, char **ID, document_vector_t *opt_doc, float frequency_scalar) {
 	int total_bag_size = 0;
+
+	int *page_token_check = malloc(sizeof(int));
+	yomu_t **page_tokens = yomu_f.children(full_page, "page", page_token_check);
+
+	if (*page_token_check == 0) {
+		free(page_tokens);
+		free(page_token_check);
+
+		return 1;
+	}
+
+	yomu_t *page_token = page_tokens[0];
+
+	free(page_tokens);
+	free(page_token_check);
 
 	// create title page:
 	// get ID
-	int *ID_len = malloc(sizeof(int));
-	*ID = token_read_all_data(grab_token_by_tag(full_page, "id"), ID_len, NULL, NULL);
+	yomu_t **id_tokens = yomu_f.children(page_token, "id", NULL);
+	yomu_t *singleton_id = yomu_f.merge(1, id_tokens);
+	*ID = yomu_f.read(singleton_id, "");
+	int ID_len = strlen(*ID);
 	if (opt_doc)
 		opt_doc->id = *ID;
 
-	total_bag_size += *ID_len - 1;
+	total_bag_size += ID_len - 1;
+
+	free(id_tokens);
 
 	// get title
-	int *title_len = malloc(sizeof(int));
-	char *title = token_read_all_data(grab_token_by_tag(full_page, "title"), title_len, NULL, NULL);
+	yomu_t **title_tokens = yomu_f.children(page_token, "title", NULL);
+	yomu_t *singleton_title = yomu_f.merge(1, title_tokens);
+	char *title = yomu_f.read(singleton_title, "");
 	if (opt_doc)
 		opt_doc->title = title;
 
@@ -86,33 +106,22 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 	fputs(*ID, title_fp->runner);
 	fputs(":", title_fp->runner);
 	fputs(title, title_fp->runner);
-	
-	free(title_len);
+
+	free(title_tokens);
+
 	free(title);
 
 	// grab full page data
-	int *page_data_len = malloc(sizeof(int)), *word_number_max = malloc(sizeof(int));
-	token_t *page_token = grab_token_by_tag(full_page, "text");
+	int *word_number_max = malloc(sizeof(int));
+	yomu_t **text_tokens = yomu_f.children(page_token, "text", NULL);
+	yomu_t *text_token = yomu_f.merge(1, text_tokens);
 
-	// setup a hashmap that will check for blocked tokens:
-	hashmap *block_tag_check = make__hashmap(0, NULL, destroy_hashmap_val);
-
-	// insert any blocked tags (currently just <style>)
-	int *style_value = malloc(sizeof(int));
-	*style_value = 1;
-	int *a_tag_value = malloc(sizeof(int));
-	*a_tag_value = 1;
-	insert__hashmap(block_tag_check, "style", style_value, "-d");
-	insert__hashmap(block_tag_check, "a", a_tag_value, "-d");
-	char *token_page_data = token_read_all_data(page_token, page_data_len, block_tag_check, is_block);
+	char *token_page_data = yomu_f.read(text_token, "-d-m", "!style");
 
 	// create an int array so we can know the length of each char *
 	int *phrase_len = malloc(sizeof(int));
 	char **full_page_data = split_string(token_page_data, ' ', word_number_max, "-l", &phrase_len);
 
-	deepdestroy__hashmap(block_tag_check);
-
-	free(page_data_len);
 	free(token_page_data);
 
 	int sum_of_squares = 0; // calculate sum of squares
@@ -145,8 +154,9 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 				if (opt_doc) {
 					float *opt_map_value = get__hashmap(opt_doc->map, full_page_data[add_hash], "");
 
-					if (opt_map_value)
-						*opt_map_value++;
+					if (opt_map_value) {
+						*opt_map_value += 1 * frequency_scalar;
+					}
 				}
 			} else { // reset features
 				hashmap_freq->tfs += hashmap_freq->curr_term_freq;
@@ -162,9 +172,9 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 				// setup document_vector_t if there
 				if (opt_doc) {
 					float *new_opt_map_value = malloc(sizeof(float));
-					*new_opt_map_value = 1;
-					
-					insert__hashmap(opt_doc->map, full_page_data[add_hash], new_opt_map_value, "", compareCharKey, NULL);
+					*new_opt_map_value = 1 * frequency_scalar;
+
+					insert__hashmap(opt_doc->map, full_page_data[add_hash], new_opt_map_value, "", NULL, compareCharKey, NULL);
 				}
 			}
 
@@ -175,7 +185,7 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 
 		tf_t *new_tf = new_tf_t(*ID);
 
-		insert__hashmap(term_freq, full_page_data[add_hash], new_tf, "", compareCharKey, destroyCharKey);
+		insert__hashmap(term_freq, full_page_data[add_hash], new_tf, "", NULL, compareCharKey, destroyCharKey);
 	}
 
 	free(word_number_max);
@@ -192,7 +202,7 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 		// update full_rep
 		// ID,freq|
 		int freq_len = (int) log10(key_freq) + 3;
-		int length = *ID_len + freq_len;
+		int length = ID_len + freq_len;
 
 		// make sure char has enough space
 		while (m_val->full_rep_index + length + 1 >= m_val->max_full_rep) {
@@ -211,7 +221,6 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 
 	free(keys);
 	free(key_len);
-	free(ID_len);
 
 	free(full_page_data);
 

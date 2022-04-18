@@ -14,6 +14,7 @@ void destroy_hashmap_float(void *v);
 char *find_and_replace(char *original, char *match, char *replacer);
 
 /* SPLIT STRING FUNCTIONALITY */
+int all_is_range(char _char);
 int char_is_range(char _char);
 int num_is_range(char _char);
 char **split_string(char *full_string, char delimeter, int *arr_len, char *extra, ...);

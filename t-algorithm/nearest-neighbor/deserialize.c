@@ -53,7 +53,7 @@ int deserialize_title(char *title_reader, hashmap *doc_map, char ***ID, int *ID_
 		free(split_row);
 
 		document_vector_t* new_doc_vector = create_document_vector((*ID)[ID_index], doc_title, mag);
-		insert__hashmap(doc_map, (*ID)[ID_index], new_doc_vector, "", compareCharKey, NULL);
+		insert__hashmap(doc_map, (*ID)[ID_index], new_doc_vector, "", NULL, compareCharKey, NULL);
 
 		ID_index++;
 		*ID = resize_array(*ID, ID_len, ID_index, sizeof(char *));
@@ -134,7 +134,7 @@ char **deserialize(char *index_reader, hashmap *term_freq, hashmap *docs, int *m
 
 		tf->doc_freq = doc_freq;
 
-		insert__hashmap(term_freq, words[words_index], tf, "", compareCharKey, NULL);
+		insert__hashmap(term_freq, words[words_index], tf, "", NULL, compareCharKey, NULL);
 
 		int read_doc_freq;
 		for (read_doc_freq = 2; read_doc_freq < *line_sub_max; read_doc_freq += 2) {
@@ -151,7 +151,7 @@ char **deserialize(char *index_reader, hashmap *term_freq, hashmap *docs, int *m
 			float *normal_term_freq = malloc(sizeof(float));
 			*normal_term_freq = term_frequency / doc_freq;
 
-			insert__hashmap(doc->map, words[words_index], normal_term_freq, "", compareCharKey, NULL);
+			insert__hashmap(doc->map, words[words_index], normal_term_freq, "", NULL, compareCharKey, NULL);
 		}
 
 		tf->standard_deviation = sqrt(tf->tfs_sq);
@@ -189,7 +189,7 @@ cluster_t **deserialize_cluster(char *filename, int k, hashmap *doc_map, char **
 
 	size_t cluster_string_size = sizeof(char);
 	char *cluster_string = malloc(cluster_string_size);
-	
+
 	int *line_len = malloc(sizeof(int));
 	int *doc_key_len = malloc(sizeof(int));
 
@@ -220,6 +220,8 @@ cluster_t **deserialize_cluster(char *filename, int k, hashmap *doc_map, char **
 		int read_doc;
 		for (read_doc = 0; read_doc < doc_pos_index; read_doc++) {
 			char *doc_key = getKey__hashmap(doc_map, cluster_data[read_doc + 2]);
+			if (!doc_key)
+                                continue;
 			free(cluster_data[read_doc + 2]);
 
 			doc_pos[read_doc] = doc_key;
@@ -236,7 +238,7 @@ cluster_t **deserialize_cluster(char *filename, int k, hashmap *doc_map, char **
 				if (!data_pt) {
 					data_pt = create_cluster_centroid_data(curr_doc_value / doc_pos_index);
 
-					insert__hashmap(centroid, curr_doc_keys[read_curr_doc_data], data_pt, "", compareCharKey, NULL);
+					insert__hashmap(centroid, curr_doc_keys[read_curr_doc_data], data_pt, "", NULL, compareCharKey, NULL);
 					continue;
 				}
 

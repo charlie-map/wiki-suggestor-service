@@ -167,7 +167,7 @@ int trie_insert_helper(hashmap *curr_node, trie_t *trie_meta_data, void *value) 
 	} else {
 		if (!sub_node) {
 			sub_node = trie_node_construct(build_alloc_char ? build_alloc_char : value, trie_meta_data->delete);
-			insert__hashmap(curr_node, build_alloc_char ? build_alloc_char : value, sub_node, "", trie_meta_data->comparer, NULL);
+			insert__hashmap(curr_node, build_alloc_char ? build_alloc_char : value, sub_node, "", NULL, trie_meta_data->comparer, NULL);
 		} else
 			free(build_alloc_char);
 

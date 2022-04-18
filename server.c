@@ -2,12 +2,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+
+#include <time.h>
 #include <math.h>
 
 // add connections to t-algorithm:
 #include "t-algorithm/serialize/serialize.h"
 #include "t-algorithm/serialize/vecrep.h"
-#include "t-algorithm/serialize/token.h"
+#include "t-algorithm/serialize/yomu.h"
+#include "t-algorithm/nearest-neighbor/heap.h"
 #include "t-algorithm/nearest-neighbor/kd-tree.h"
 #include "t-algorithm/nearest-neighbor/k-means.h"
 #include "t-algorithm/nearest-neighbor/deserialize.h"
@@ -18,6 +21,12 @@
 // database
 #include "databaseC/db.h"
 
+// matrix / linalg
+#include "matrix/vector.h"
+#include "matrix/matrix.h"
+#include "matrix/rand.h"
+#include "matrix/linreg.h"
+
 #include "teru.h"
 
 #define HOST "*"
@@ -26,7 +35,9 @@
 #define K 32
 #define CLUSTER_THRESHOLD 2
 
-#define RELOAD 0
+#define RELOAD 1
+
+#define RECOMMENDER_DOC_NUMBER 5
 
 MYSQL *db;
 
@@ -53,13 +64,14 @@ void *next_dimension(void *dimensions, void *curr_dimension);
 hashmap *build_dimensions(char ***dimension_groups, void *curr_vector_group, char vector_type);
 
 void nearest_neighbor(req_t req, res_t res);
-void unique_recommend(req_t req, res_t res);
+void unique_recommend_v2(req_t req, res_t res);
 
 int main() {
 	teru_t app = teru();
+	yomu_f.init();
 
 	app_post(app, "/nn", nearest_neighbor);
-	app_post(app, "/ur", unique_recommend);
+	app_post(app, "/ur", unique_recommend_v2);
 
 	stopword_trie = fill_stopwords("t-algorithm/serialize/stopwords.txt");
 
@@ -142,6 +154,7 @@ int main() {
 
 	trie_destroy(stopword_trie);
 	mysql_close(db);
+	yomu_f.close();
 
 	return 0;
 }
@@ -174,19 +187,20 @@ void nearest_neighbor(req_t req, res_t res) {
 
 		sprintf(full_page, "<page>\n<id>%s</id>\n<title>%s</title>\n<text>%s</text>\n</page>", curr_docID, page_title, page_text);
 
-		token_t *token_wiki_page = tokenize('s',full_page);
+		yomu_t *token_wiki_page = yomu_f.parse(full_page);
 
 		curr_doc = create_document_vector(curr_docID, page_title, 0);
 
 		pthread_mutex_lock(&(term_freq->mutex));
 		pthread_mutex_lock(&ID_mutex);
-		token_to_terms((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), curr_doc);
+		token_to_terms((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), curr_doc, 1);
 		pthread_mutex_unlock(&(term_freq->mutex));
 
 		ID_index++;
 		ID = resize_array(ID, ID_len, ID_index, sizeof(char *));
 
 		pthread_mutex_unlock(&ID_mutex);
+		yomu_f.destroy(token_wiki_page);
 
 		// curr doc now holds all the data which the next steps need
 	}
@@ -219,10 +233,10 @@ void nearest_neighbor(req_t req, res_t res) {
 
 	char *page_name_tag = (char *) get__hashmap(db_r->row__data[0], "page_name", "");
 
-	token_t *page_token = tokenize('s', page_name_tag);
+	yomu_t *page_token = yomu_f.parse(page_name_tag);
 
 	int *page_name_len = malloc(sizeof(int));
-	char *page_name_pre_find = token_read_all_data(page_token, page_name_len, NULL, NULL);
+	char *page_name_pre_find = yomu_f.read(page_token, "");
 	char *page_name = find_and_replace(page_name_pre_find, "&amp;", "&");
 
 	free(page_name_pre_find);
@@ -234,7 +248,7 @@ void nearest_neighbor(req_t req, res_t res) {
 	free(dimension_charset);
 	free(cluster_docs);
 
-	destroy_token(page_token);
+	yomu_f.destroy(page_token);
 	kdtree_destroy(cluster_rep);
 	deepdestroy__hashmap(closest_cluster_dimensions);
 	db_res_destroy(db_r);
@@ -242,12 +256,94 @@ void nearest_neighbor(req_t req, res_t res) {
 	return;
 }
 
-int p_tag_match(token_t *t) {
-	return token_has_classname(t, "mw-empty-elt") ? 0 : 1;
+int p_tag_match(yomu_t *t) {
+	return yomu_f.hasClass(t, "mw-empty-elt") ? 0 : 1;
 }
-// expects user unique ID (uuid form) which connects to then selecting all documents
-// they have viewed thus far
-void unique_recommend(req_t req, res_t res) {
+
+float compute_p_value(int vote, float vote_time, float focus_time, float avvt, float avft) {
+	return ((vote == 3 ? 3.1 : vote) - 3) * ((vote_time == 0 ? 0.1 : vote_time) / 
+		(avvt == 0 ? 0.1 : avvt)) * (focus_time / (avft == 0 ? 0.1 : avft));
+}
+
+int float_compare(void *f1, void *f2) {
+	return *(float *) f1 < *(float *) f2;
+}
+
+/*
+	will find highest term frequencied words using a heap
+*/
+char **compute_best_words(hashmap *user_doc, hashmap *user_term_freq, int *final_len) {
+	// first pull out document IDs:
+	int *user_doc_key_len = malloc(sizeof(int));
+	char **user_doc_key = (char **) keys__hashmap(user_doc, user_doc_key_len, "");
+	printf("doc keys %d\n", *user_doc_key_len);
+
+	int *doc_key_len = malloc(sizeof(int));
+	for (int user_doc_p = 0; user_doc_p < *user_doc_key_len; user_doc_p++) {
+
+		hashmap *curr_doc = ((document_vector_t *) get__hashmap(user_doc, user_doc_key[user_doc_p], ""))->map;
+		// grab words for specific document
+		char **doc_key = (char **) keys__hashmap(curr_doc, doc_key_len, "");
+		printf("%d sub docs\n", *doc_key_len);
+
+		// check each term and its frequency and add to user_term_freq hashmap
+		for (int doc_p = 0; doc_p < *doc_key_len; doc_p++) {
+			float *existence = (float *) get__hashmap(user_term_freq, doc_key[doc_p], "");
+			float *doc_v = (float *) get__hashmap(curr_doc, doc_key[doc_p], "");
+
+			if (existence) {
+				*existence += doc_v ? *doc_v : 0;
+			} else {
+				float *new_term_freq = malloc(sizeof(float));
+				*new_term_freq = 1.0 + (doc_v ? *doc_v : 0);
+				insert__hashmap(user_term_freq, doc_key[doc_p], new_term_freq, "", NULL, compareCharKey, NULL);
+			}
+		}
+
+		free(doc_key);
+	}
+
+	// after initial insertions into user_term_freq, use
+	// user_term_freq_pq to find the most important words in user_term_freq
+	heap_t *user_term_freq_pq = heap_create(float_compare);
+
+	int *user_term_freq_key_len = malloc(sizeof(int));
+	char **user_term_freq_key = (char **) keys__hashmap(user_term_freq, user_term_freq_key_len, "");
+
+	for (int doc_key_p = 0; doc_key_p < *user_term_freq_key_len; doc_key_p++) {
+		float *key_freq = (float *) get__hashmap(user_term_freq, user_term_freq_key[doc_key_p], "");
+
+		heap_push(user_term_freq_pq, user_term_freq_key[doc_key_p], key_freq);
+
+		if (doc_key_p >= 50) {
+			heap_pop(user_term_freq_pq, 0);
+		}
+	}
+
+	free(user_term_freq_key_len);
+	free(user_term_freq_key);
+
+	// now slowly loop through each heap value
+	int heap_len = heap_size(user_term_freq_pq);
+
+	char **best_words = malloc(sizeof(char *) * (heap_len + 1));
+	for (int best = 0; best < heap_len; best++)
+		best_words[best] = (char *) heap_pop(user_term_freq_pq, 0);
+
+	best_words[heap_len] = NULL;
+	*final_len = heap_len;
+
+	free(doc_key_len);
+
+	free(user_doc_key);
+	free(user_doc_key_len);
+
+	heap_destroy(&user_term_freq_pq);
+
+	return best_words;
+}
+
+void unique_recommend_v2(req_t req, res_t res) {
 	// calculate user id via their uuid
 	char *user_uuid = req_body(req, "uuid");
 
@@ -256,7 +352,7 @@ void unique_recommend(req_t req, res_t res) {
 		return;
 	}
 
-	db_res *db_r = db_query(db, "SELECT id, age FROM user WHERE unique_id=?", user_uuid);
+	db_res *db_r = db_query(db, "SELECT id, age, avvt, avft FROM user WHERE unique_id=?", user_uuid);
 
 	if (!db_r->row_count) {
 		db_res_destroy(db_r);
@@ -266,26 +362,48 @@ void unique_recommend(req_t req, res_t res) {
 	}
 
 	// grab user ID
-	char *buffer_user_ID = (char *) get__hashmap(db_r->row__data[0], "id", "");
-	char *user_ID = malloc(sizeof(char) * (strlen(buffer_user_ID) + 1)); strcpy(user_ID, buffer_user_ID);
-
-	db_res_destroy(db_r);
+	char *user_ID = (char *) get__hashmap(db_r->row__data[0], "id", "");
 
 	// get page_id, vote, page_vote_time, and focus_time from view_vote table
-	db_r = db_query(db, "SELECT page_id, vote, page_vote_time, focus_time FROM view_vote WHERE user_id=?", user_ID);
-	free(user_ID);
+	db_res *user_votes = db_query(db, "SELECT page_id, vote, page_vote_time, focus_time FROM view_vote WHERE user_id=?", user_ID);
 
-	if (!db_r->row_count) {
+	if (!user_votes->row_count) {
 		db_res_destroy(db_r);
 
 		res_end(res, "000"); // some internal code I just made up and will soon forget
 		return;
 	}
 
+	// compute an estimated p value:
+	/*
+		the final desired range is between -1 (strong negative user pref) and 1 (strong positive user pref)
+
+		the most efficient way will be to just compute some number using the following equation and then
+		scale the results down based on the maximum on the negative side and positive side. For example,
+		the following array of initial computed numbers:
+
+		[-5.4, -3, -0.1, 0.25, 3.2]
+
+		would become:
+
+		[-1, -0.56, -0.02, 0.08, 1]
+
+		To compute the initial numbers, the following equation will be used:
+
+		((v1 == 3 ? 3.1 : v1) - 3) * (vt / avvt) * (ft / avft)
+
+		where v1 = vote (1-5, defaults to 4 if they don't vote on it),
+			  vt = vote time (0-?, the time at which they vote in hours, defaults to 0.1
+			  	since any higher will too dramatically alter results)
+			  ft = focus time (0-?, the time focused on the tab)
+
+		SEE compute_p_value
+	*/
+	// compute a user vector using all of the users documents (code from unique_recommnder)
 	hashmap *sub_user_doc = make__hashmap(0, NULL, NULL);
-	document_vector_t **full_document_vectors = malloc(sizeof(document_vector_t *) * db_r->row_count);
-	for (int copy_document_vector = 0; copy_document_vector < db_r->row_count; copy_document_vector++) {
-		char *page_id = (char *) get__hashmap(db_r->row__data[copy_document_vector], "page_id", "");
+	document_vector_t **full_document_vectors = malloc(sizeof(document_vector_t *) * user_votes->row_count);
+	for (int copy_document_vector = 0; copy_document_vector < user_votes->row_count; copy_document_vector++) {
+		char *page_id = (char *) get__hashmap(user_votes->row__data[copy_document_vector], "page_id", "");
 		full_document_vectors[copy_document_vector] = get__hashmap(doc_map, page_id, "");
 
 		// need to serialize
@@ -299,22 +417,23 @@ void unique_recommend(req_t req, res_t res) {
 
 			sprintf(full_page, "<page>\n<id>%s</id>\n<title>%s</title>\n<text>%s</text>\n</page>", page_id, page_title, page_text);
 
-			token_t *token_wiki_page = tokenize('s',full_page);
+			yomu_t *token_wiki_page = yomu_f.parse(full_page);
 
 			full_document_vectors[copy_document_vector] = create_document_vector(page_id, page_title, 0);
 
 			pthread_mutex_lock(&(term_freq->mutex));
 			pthread_mutex_lock(&ID_mutex);
-			token_to_terms((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), full_document_vectors[copy_document_vector]);
+			token_to_terms((hashmap *) term_freq->runner, title_fp, stopword_trie, token_wiki_page, &(ID[ID_index]), full_document_vectors[copy_document_vector], 1);
 			pthread_mutex_unlock(&(term_freq->mutex));
 
 			ID_index++;
 			ID = resize_array(ID, ID_len, ID_index, sizeof(char *));
 
 			pthread_mutex_unlock(&ID_mutex);
+			yomu_f.destroy(token_wiki_page);
 		}
 
-		insert__hashmap(sub_user_doc, page_id, full_document_vectors[copy_document_vector], "", compareCharKey, NULL);
+		insert__hashmap(sub_user_doc, page_id, full_document_vectors[copy_document_vector], "", NULL, compareCharKey, NULL);
 	}
 
 	// otherwise we can move forward to computing a centroid
@@ -327,54 +446,201 @@ void unique_recommend(req_t req, res_t res) {
 	user_doc_vec->map = user_cluster->centroid;
 
 	pthread_mutex_lock(&(mutex_doc_vector_kdtree->mutex));
-	s_pq_t *closest_doc_vector = kdtree_search(mutex_doc_vector_kdtree->runner, doc_vector_kdtree_start_dimension, user_doc_vec, 3, (void **) full_document_vectors, db_r->row_count);
+	s_pq_t *closest_doc_vector = kdtree_search(mutex_doc_vector_kdtree->runner, doc_vector_kdtree_start_dimension, user_doc_vec, RECOMMENDER_DOC_NUMBER, (void **) full_document_vectors, user_votes->row_count);
 	pthread_mutex_unlock(&(mutex_doc_vector_kdtree->mutex));
 
-	int curr_doc_titles_len = 2;
-	char *doc_titles = malloc(sizeof(char) * curr_doc_titles_len);
+	// find top 50 words from within the user_cluster to create a ranking
+	// matrix that correlates to the votes on pages
+	hashmap *user_term_freq = make__hashmap(0, NULL, destroy_hashmap_float);
+	int *real_user_words_len = malloc(sizeof(int));
+	char **user_words_top50 = compute_best_words(sub_user_doc, user_term_freq, real_user_words_len);
+
+	// create matrix with the term frequency of the top 50 words of each document:
+	double *term_matrix = malloc(sizeof(double) * (*real_user_words_len * user_votes->row_count));
+	double *resultant_y = malloc(sizeof(double) * user_votes->row_count);
+
+	for (int doc_vec_p = 0; doc_vec_p < user_votes->row_count; doc_vec_p++) {
+		int row_jump = doc_vec_p * *real_user_words_len;
+
+		// loop through words and find the term freq to place into the term_matrix
+		// also make sure to update the vote value in resultant_y
+		resultant_y[doc_vec_p] = atof((char *) get__hashmap(user_votes->row__data[doc_vec_p], "vote", ""));
+		resultant_y[doc_vec_p] = resultant_y[doc_vec_p] == 0 ? 1 : resultant_y[doc_vec_p] == 2 ?
+			-0.1 : resultant_y[doc_vec_p] - 2;
+
+		for (int word_p = 0; word_p < *real_user_words_len; word_p++) {
+			float *doc_term_freq = (float *) get__hashmap(full_document_vectors[doc_vec_p]->map, user_words_top50[word_p], "");
+			pthread_mutex_lock(&term_freq->mutex);
+			float doc_freq = ((tf_t *) get__hashmap(term_freq->runner, user_words_top50[word_p], ""))->doc_freq * 1.0;
+			pthread_mutex_unlock(&term_freq->mutex);
+
+			printf("%s -- %1.3f * %1.3f - ", user_words_top50[word_p], doc_term_freq ? *doc_term_freq : 0, doc_freq);
+			term_matrix[row_jump + word_p] = doc_term_freq ? (*doc_term_freq == 0 ? 0.1 * doc_freq : *doc_term_freq * doc_freq) : 0.0;
+			printf("final: %1.3f\n", term_matrix[row_jump + word_p]);
+		}
+	}
+
+	deepdestroy__hashmap(user_term_freq);
+	// compute the weight for each term:
+	for (int i = 0; i < user_votes->row_count; i++) {
+		printf("%d: ", i);
+
+		for (int j = 0; j < *real_user_words_len; j++) {
+			printf("%lf - ", term_matrix[i * user_votes->row_count + j]);
+		}
+		printf("\n");
+	}
+
+	printf("%d, %d\n", user_votes->row_count, *real_user_words_len);
+	struct matrix *A = matrix_from_array(term_matrix, user_votes->row_count, *real_user_words_len);
+	struct vector *y = vector_from_array(resultant_y, user_votes->row_count);
+
+	free(term_matrix);
+	free(resultant_y);
+
+	db_res_destroy(user_votes);
+	struct linreg *linreg_weight = linreg_fit(A, y);
+
+	matrix_free(A);
+	vector_free(y);
+
+	int current_placed_recommended = 0;
+	double *recommended_doc_vec_ranks = malloc(sizeof(double) * RECOMMENDER_DOC_NUMBER);
+	memset(recommended_doc_vec_ranks, 0, sizeof(double) * RECOMMENDER_DOC_NUMBER);
+
+	document_vector_t **recommended_doc_vec_order = malloc(sizeof(document_vector_t *) * RECOMMENDER_DOC_NUMBER);
+	int set_mem = 0;
+	for (s_pq_node_t *curr_doc_vec = closest_doc_vector->min; curr_doc_vec; curr_doc_vec = curr_doc_vec->next) {
+		recommended_doc_vec_order[set_mem] = (document_vector_t *) curr_doc_vec->payload;
+		set_mem++;
+	}
+
+	if (linreg_weight) {
+		struct vector *w = linreg_weight->beta;
+
+		// use weights in w to calculate a ranking scheme for the returned 5 best documents
+		for (s_pq_node_t *curr_doc_vec = closest_doc_vector->min; curr_doc_vec;) {
+			document_vector_t *cdv = (document_vector_t *) curr_doc_vec->payload;
+
+			double *doc_vec_key = malloc(sizeof(double) * *real_user_words_len);
+
+			for (int get_key = 0; get_key < *real_user_words_len; get_key++) {
+				float *doc_term_freq = (float *) get__hashmap(cdv->map, user_words_top50[get_key], "");
+
+				doc_vec_key[get_key] = doc_term_freq ? *doc_term_freq : 0;
+			}
+
+			struct vector *doc_v = vector_from_array(doc_vec_key, *real_user_words_len);
+
+			double resultant_y = vector_dot_product(doc_v, w);
+			vector_free(doc_v);
+
+			// find position in recommended_doc_vec_ranks and recommended_doc_vec_order
+			// for new document based on the weight
+			int document_placement;
+			for (document_placement = 0; document_placement < current_placed_recommended; document_placement++) {
+				if (resultant_y > recommended_doc_vec_ranks[document_placement])
+					break;
+			}
+
+			// based on document_placement, splice in the new document:
+			double rank_buffer; document_vector_t *doc_vec_buffer;
+			for (document_placement; document_placement < current_placed_recommended; document_placement++) {
+				rank_buffer = recommended_doc_vec_ranks[document_placement];
+				recommended_doc_vec_ranks[document_placement] = resultant_y;
+
+				doc_vec_buffer = recommended_doc_vec_order[document_placement];
+				recommended_doc_vec_order[document_placement] = cdv;
+			}
+
+			current_placed_recommended++;
+		}
+
+		linreg_free(linreg_weight);
+	} else {
+		current_placed_recommended = 4;
+	}
+
+	free(real_user_words_len);
+	free(user_words_top50);
+	free(recommended_doc_vec_ranks);
+
+	// with sorted recommended_doc_vec_order, loop through them and
+	// compute the data to send to frontend:
+	int *curr_doc_titles_len = malloc(sizeof(int)), doc_titles_index = 1;
+	*curr_doc_titles_len = 512;
+	char *doc_titles = malloc(sizeof(char) * *curr_doc_titles_len);
 	doc_titles[0] = '[';
 	doc_titles[1] = '\0';
 
-	hashmap *block_tag_check = make__hashmap(0, NULL, destroy_hashmap_val);
+	printf("%d\n", current_placed_recommended);
+	s_pq_node_t *del_pq_vec = closest_doc_vector->min;
+	for (int compute_title_style = 0; compute_title_style < current_placed_recommended + 1; compute_title_style++) {
+		document_vector_t *curr_doc_vec = recommended_doc_vec_order[compute_title_style];
+		if (!curr_doc_vec) break;
 
-	int *style_value = malloc(sizeof(int));
-	*style_value = 1;
-
-	insert__hashmap(block_tag_check, "style", style_value, "-d");
-
-	for (s_pq_node_t *start_doc = closest_doc_vector->min; start_doc;) {
-		document_vector_t *curr_doc_vec = (document_vector_t *) start_doc->payload;
-
+		printf("%s\n", curr_doc_vec->id);
 		db_res *db_doc = db_query(db, "SELECT wiki_page FROM page WHERE id=?", curr_doc_vec->id);
 
-		token_t *token_curr_doc_vec = tokenize('s', (char *) get__hashmap(db_doc->row__data[0], "wiki_page", ""));
+		yomu_t *token_curr_doc_vec = yomu_f.parse((char *) get__hashmap(db_doc->row__data[0], "wiki_page", ""));
 
 		db_res_destroy(db_doc);
 		// a couple of data items we can grab:
 		// first image we encounter
-		token_t *get_first_image = grab_token_by_tag_maxsearch(token_curr_doc_vec, "img", 20);
-		char *image_url = get_first_image ? token_attr(get_first_image, "src") + sizeof(char) * 2 : "";
-		// first couple blips of text within first p tag in div.mw-parser-output
+		int *image_token_len = malloc(sizeof(int));
+		yomu_t **images = yomu_f.find(token_curr_doc_vec, "img", image_token_len);
+		// look for first occurrence of an image with the class "thumbimage"
+		int find_thumb;
+		for (find_thumb = 0; find_thumb < *image_token_len; find_thumb++)
+			if (yomu_f.hasClass(images[find_thumb], "thumbimage"))
+				break;
+		yomu_t *get_first_image = *image_token_len == 0 ? NULL : find_thumb == *image_token_len ?
+			images[0] : images[find_thumb];
 
-		token_t *get_mw_parser_output = grab_token_by_classname(token_curr_doc_vec, "mw-parser-output");
+		char *image_url = get_first_image ? yomu_f.attr.get(get_first_image, "src") + sizeof(char) * 2 : "";
+		// first couple blips of text within first p tag in div.mw-parser-output
+		free(images);
+		free(image_token_len);
+
+		int *p_tag_len = malloc(sizeof(int));
+		yomu_t **p_yomu = yomu_f.find(token_curr_doc_vec, "p", p_tag_len);
 		// then select p tags, (maybe look at first couple?)
 		// need a way to selectively choose if skips should occur
-		int *document_intro_len = malloc(sizeof(int));
-		token_t *tag_match = grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match);
-		char *document_intro_pre = token_read_all_data(grab_token_by_tag_matchparam(get_mw_parser_output, "p", p_tag_match), document_intro_len, block_tag_check, is_block);
+		int choose_p_tag;
+		for (choose_p_tag = 0; choose_p_tag < *p_tag_len; choose_p_tag++)
+			if (!yomu_f.hasClass(p_yomu[choose_p_tag], "mw-empty-elt"))
+				break;
+
+		char *document_intro_pre;
+		if (choose_p_tag < *p_tag_len)
+			document_intro_pre = yomu_f.read(p_yomu[choose_p_tag], "");
+		else {
+			document_intro_pre = malloc(sizeof(char) * 27);
+			strcpy(document_intro_pre, "Description not available.");
+		}
+
+		free(p_yomu);
+		free(p_tag_len);
+
 		char *document_intro;
-		if (*document_intro_len) {
+		if (document_intro_pre) {
 			char *document_intro_fix_quote = find_and_replace(document_intro_pre, "\"", "&ldquo;");
 			char *document_intro_fix_space = find_and_replace(document_intro_fix_quote, "&nbsp;", " ");
 			char *document_intro_fix_tab = find_and_replace(document_intro_fix_space, "\t", " ");
+			char *document_intro_fix_newline = find_and_replace(document_intro_fix_tab, "\n", " ");
+			char *document_intro_fix_backslash = find_and_replace(document_intro_fix_newline, "\\", " ");
+
 			free(document_intro_fix_quote);
 			free(document_intro_fix_space);
+			free(document_intro_fix_tab);
+			free(document_intro_fix_newline);
+
 			char *en_dash = malloc(sizeof(char) * 2);
 			sprintf(en_dash, "%c", 150);
-			document_intro = find_and_replace(document_intro_fix_tab, en_dash, "-");
+			document_intro = find_and_replace(document_intro_fix_backslash, en_dash, "-");
 
 			free(en_dash);
-			free(document_intro_fix_tab);
+			free(document_intro_fix_backslash);
 		} else {
 			document_intro = malloc(sizeof(char) * 22);
 			strcpy(document_intro, "No description found.");
@@ -384,35 +650,37 @@ void unique_recommend(req_t req, res_t res) {
 
 		int new_len = strlen(curr_doc_vec->title) + strlen(image_url) + strlen(document_intro) + 38;
 
-		doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + new_len));
-		char *remove_amp_title = find_and_replace(((document_vector_t *) start_doc->payload)->title, "&amp;", "&");
+		doc_titles = resize_array(doc_titles, curr_doc_titles_len, doc_titles_index + new_len, sizeof(char));
+		char *remove_amp_title = find_and_replace(curr_doc_vec->title, "&amp;", "&");
 
-		sprintf(doc_titles + sizeof(char) * (curr_doc_titles_len - 1),
+		sprintf(doc_titles + sizeof(char) * doc_titles_index,
 			"{\"title\":\"%s\",\"image\":\"%s\",\"descript\":\"%s\"}", remove_amp_title, image_url, document_intro);
 
 		free(remove_amp_title);
-		curr_doc_titles_len += new_len;
-		if (start_doc->next)
-			doc_titles[curr_doc_titles_len - 2] = ',';
+		doc_titles_index += new_len;
+		if (compute_title_style < current_placed_recommended)
+			doc_titles[doc_titles_index - 1] = ',';
 
-		doc_titles[curr_doc_titles_len - 1] = '\0';
+		doc_titles[doc_titles_index] = '\0';
 
-		free(document_intro_len);
 		free(document_intro);
-                destroy_token(token_curr_doc_vec);
+		yomu_f.destroy(token_curr_doc_vec);
 
-		s_pq_node_t *next = start_doc->next;
-		free(start_doc);
-
-		start_doc = next;
+		s_pq_node_t *del_pq_vec_next = del_pq_vec ? del_pq_vec->next : NULL;
+		if (del_pq_vec)
+			free(del_pq_vec);
+		del_pq_vec = del_pq_vec_next;
 	}
 
-	doc_titles = realloc(doc_titles, sizeof(char) * (curr_doc_titles_len + 1));
+	doc_titles = resize_array(doc_titles, curr_doc_titles_len, doc_titles_index + 1, sizeof(char));
 	strcat(doc_titles, "]");
 
+	free(curr_doc_titles_len);
 	free(full_document_vectors);
 	free(closest_doc_vector);
 	free(user_doc_vec);
+
+	free(recommended_doc_vec_order);
 
 	db_res_destroy(db_r);
 
@@ -420,6 +688,7 @@ void unique_recommend(req_t req, res_t res) {
 	deepdestroy__hashmap(sub_user_doc);
 	destroy_cluster(user_cluster_wrapped, 1);
 
+	printf("%s\n", doc_titles);
 	res_end(res, doc_titles);
 
 	free(doc_titles);
@@ -488,10 +757,10 @@ hashmap *build_dimensions(char ***dimension_groups, void *curr_vector_group, cha
 	hashmap *dimensions = make__hashmap(0, NULL, NULL);
 
 	for (int insert_word = 0; insert_word < *key_length - 1; insert_word++) {
-		insert__hashmap(dimensions, (*dimension_groups)[insert_word], (*dimension_groups)[insert_word + 1], "", compareCharKey, NULL);
+		insert__hashmap(dimensions, (*dimension_groups)[insert_word], (*dimension_groups)[insert_word + 1], "", NULL, compareCharKey, NULL);
 	}
 
-	insert__hashmap(dimensions, (*dimension_groups)[*key_length - 1], (*dimension_groups)[0], "", compareCharKey, NULL);
+	insert__hashmap(dimensions, (*dimension_groups)[*key_length - 1], (*dimension_groups)[0], "", NULL, compareCharKey, NULL);
 
 	free(key_length);
 	return dimensions;

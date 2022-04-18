@@ -301,6 +301,10 @@ int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void
 	if (curr_s_ll->pq_size == max_document_returns)
 		return 0;
 
+	printf("Nodes: n:%d, l:%d, r:%d -- is Payload: n:%d, l:%d, r:%d\n", k_node, k_node->left,
+		k_node->right, k_node ? is_not_search_node(k_node->payload, current_payloads, number_of_payloads) : 0,
+		k_node->left ? is_not_search_node(k_node->left->payload, current_payloads, number_of_payloads) : 0,
+		k_node->right ? is_not_search_node(k_node->right->payload, current_payloads, number_of_payloads) : 0);
 	if (!k_node->right && !k_node->left) {
 		if (is_not_search_node(k_node->payload, current_payloads, number_of_payloads))
 			insert_pq(curr_s_ll, k_node->payload);
@@ -326,9 +330,12 @@ int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void
 
 	search_kdtree_helper(k_t, weight ? k_node->right : k_node->left, k_t->next_d(k_t->dimensions, dimension), search_payload, curr_s_ll, max_document_returns, current_payloads, number_of_payloads);
 
-	// if pq isn't full, add k_node anyways
+	// if pq isn't full, add k_node anyways (if not already matched
 	if (curr_s_ll->pq_size < max_document_returns) {
-		return insert_pq(curr_s_ll, k_node->payload);
+		if (is_not_search_node(k_node->payload, current_payloads, number_of_payloads))
+			return insert_pq(curr_s_ll, k_node->payload);
+		else // search other side of tree for more values
+			return search_kdtree_helper(k_t, weight ? k_node->left : k_node->right, k_t->next_d(k_t->dimensions, dimension), search_payload, curr_s_ll, max_document_returns, current_payloads, number_of_payloads);
 	}
 
 	float *meta_curr_document_distances = malloc(sizeof(float) * max_document_returns);

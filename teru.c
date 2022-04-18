@@ -174,7 +174,7 @@ int build_new_route(teru_t app, char *type, char *endpoint, void (*handler)(req_
 	listen_t *r = new_listener(type, handler, app.app_ptr->curr_add_num, url_wrap);
 	app.app_ptr->curr_add_num += 1;
 
-	insert__hashmap(app.routes, endpoint, r, "", compareCharKey, NULL);
+	insert__hashmap(app.routes, endpoint, r, "", NULL, compareCharKey, NULL);
 
 	return 0;
 }
@@ -213,7 +213,7 @@ void app_use(teru_t app, char *route, ...) {
 	strcpy(descript, file_path);
 	strcat(descript, sub_path);
 
-	insert__hashmap(app.use_settings, route, descript, "", compareCharKey, NULL);
+	insert__hashmap(app.use_settings, route, descript, "", NULL, compareCharKey, NULL);
 
 	if (route[0] == '/') {
 		// add if a new route
@@ -248,7 +248,7 @@ void app_set(teru_t app, char *route, ...) {
 	strcat(new_route_name, route);
 
 	if (descript)
-		insert__hashmap(app.set_settings, new_route_name, descript, "", compareCharKey, destroyCharKey);
+		insert__hashmap(app.set_settings, new_route_name, descript, "", NULL, compareCharKey, destroyCharKey);
 
 	return;
 }
@@ -267,8 +267,8 @@ void app_set(teru_t app, char *route, ...) {
 void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 	// create initial hashmap
 	hashmap *headers = make__hashmap(0, NULL, NULL);
-	insert__hashmap(headers, "Access-Control-Allow-Origin", "*", "", compareCharKey, NULL);
-	insert__hashmap(headers, "Connection", "Keep-Alive", "", compareCharKey, NULL);
+	insert__hashmap(headers, "Access-Control-Allow-Origin", "*", "", NULL, compareCharKey, NULL);
+	insert__hashmap(headers, "Connection", "Keep-Alive", "", NULL, compareCharKey, NULL);
 
 	va_list read_opts;
 	va_start(read_opts, options);
@@ -280,7 +280,7 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 			continue;
 
 		if (options[check_option + 1] == 't') {
-			insert__hashmap(headers, "Content-Type", "text/plain", "", compareCharKey, NULL);
+			insert__hashmap(headers, "Content-Type", "text/plain", "", NULL, compareCharKey, NULL);
 
 			data = va_arg(read_opts, char *);
 			data_length = strlen(data);
@@ -291,12 +291,12 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 
 			char *content_type = content_type_infer(inferer_map, file_data_name, data, data_length);
 
-			insert__hashmap(headers, "Content-Type", content_type, "", compareCharKey, NULL);
+			insert__hashmap(headers, "Content-Type", content_type, "", NULL, compareCharKey, NULL);
 		} else if (options[check_option + 1] == 'o') {
 			char *new_header_name = va_arg(read_opts, char *);
 			char *new_header_value = va_arg(read_opts, char *);
 
-			insert__hashmap(headers, new_header_name, new_header_value, "", compareCharKey, NULL);
+			insert__hashmap(headers, new_header_name, new_header_value, "", NULL, compareCharKey, NULL);
 		}
 	}
 
@@ -304,7 +304,7 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 	if (data_length) {
 		lengthOf_data_length = malloc(sizeof(char) * ((int) log10(data_length) + 2));
 		sprintf(lengthOf_data_length, "%d", data_length);
-		insert__hashmap(headers, "Content-Length", lengthOf_data_length, "", compareCharKey, NULL);
+		insert__hashmap(headers, "Content-Length", lengthOf_data_length, "", NULL, compareCharKey, NULL);
 	}
 
 	int *head_msg_len = malloc(sizeof(int));
@@ -389,7 +389,7 @@ int read_query(char *query, int curr_point, hashmap *header_ptr, int content_len
 	while ((query[curr_point] != ' ' && query[curr_point] != '\n') &&
 		(content_length == 0 || curr_point < content_length)) {
 		if (query[curr_point] == '&') {
-			insert__hashmap(header_ptr, query_key, query_value, "", compareCharKey, destroyCharKey);
+			insert__hashmap(header_ptr, query_key, query_value, "", NULL, compareCharKey, destroyCharKey);
 
 			*query_key_max = 8; *query_value_max = 8;
 			query_key_index = 0; query_value_index = 0;
@@ -422,7 +422,7 @@ int read_query(char *query, int curr_point, hashmap *header_ptr, int content_len
 	}
 
 	if (query_key_index > 0 && query_value_index > 0)
-		insert__hashmap(header_ptr, query_key, query_value, "", compareCharKey, destroyCharKey);
+		insert__hashmap(header_ptr, query_key, query_value, "", NULL, compareCharKey, destroyCharKey);
 
 	free(query_key_max);
 	free(query_value_max);
@@ -1078,7 +1078,7 @@ int res_matches(res_t res, char *match, char *replacer) {
 	if (!res_pt->render_matches)
 		res_pt->render_matches = make__hashmap(0, NULL, NULL);
 
-	insert__hashmap(res_pt->render_matches, match, replacer, "", compareCharKey, NULL);
+	insert__hashmap(res_pt->render_matches, match, replacer, "", NULL, compareCharKey, NULL);
 
 	return 0;
 }
