@@ -23,6 +23,7 @@ void *resize_array(void *arr, int *max_len, int curr_index, size_t singleton_siz
 char *find_and_replace(char *original, char *match, char *replacer) {
 	int *new_len = malloc(sizeof(int)), index_new = 0; *new_len = 8;
 	char *new = malloc(sizeof(char) * *new_len);
+	new[0] = '\0';
 
 	int match_len = strlen(match), replacer_len = strlen(replacer);
 	int index_match_check = 0;
