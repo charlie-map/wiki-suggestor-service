@@ -35,7 +35,7 @@
 #define K 32
 #define CLUSTER_THRESHOLD 2
 
-#define RELOAD 0
+#define RELOAD 1
 
 #define RECOMMENDER_DOC_NUMBER 5
 
@@ -276,6 +276,7 @@ char **compute_best_words(hashmap *user_doc, hashmap *user_term_freq, int *final
 	// first pull out document IDs:
 	int *user_doc_key_len = malloc(sizeof(int));
 	char **user_doc_key = (char **) keys__hashmap(user_doc, user_doc_key_len, "");
+	printf("doc keys %d\n", *user_doc_key_len);
 
 	int *doc_key_len = malloc(sizeof(int));
 	for (int user_doc_p = 0; user_doc_p < *user_doc_key_len; user_doc_p++) {
@@ -283,6 +284,7 @@ char **compute_best_words(hashmap *user_doc, hashmap *user_term_freq, int *final
 		hashmap *curr_doc = ((document_vector_t *) get__hashmap(user_doc, user_doc_key[user_doc_p], ""))->map;
 		// grab words for specific document
 		char **doc_key = (char **) keys__hashmap(curr_doc, doc_key_len, "");
+		printf("%d sub docs\n", *doc_key_len);
 
 		// check each term and its frequency and add to user_term_freq hashmap
 		for (int doc_p = 0; doc_p < *doc_key_len; doc_p++) {
@@ -489,6 +491,7 @@ void unique_recommend_v2(req_t req, res_t res) {
 		printf("\n");
 	}
 
+	printf("%d, %d\n", user_votes->row_count, *real_user_words_len);
 	struct matrix *A = matrix_from_array(term_matrix, user_votes->row_count, *real_user_words_len);
 	struct vector *y = vector_from_array(resultant_y, user_votes->row_count);
 

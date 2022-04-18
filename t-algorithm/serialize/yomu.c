@@ -743,6 +743,9 @@ int tokenizeMETA(FILE *file, char *str_read, yomu_t *curr_tree) {
 					continue;
 				}
 
+				if (!curr_tree) {
+					printf("uh oh\n");
+				}
 				tag_reader tag_read = read_tag(curr_tree, file, str_read, buffer_reader, buffer_size, search_token);
 				search_token = tag_read.new_search_token;
 
@@ -1116,6 +1119,7 @@ yomu_t *yomu_merge(int y_len, yomu_t **y) {
 	y_cp->data = realloc(y_cp->data, sizeof(char) * *y_cp->max_data);
 
 	for (int update_children = 0; update_children < y_len; update_children++) {
+		printf("%s\n", y[update_children]->tag);
 		if (!yomu_f.close_forbidden(yomu_f.forbidden_close_tags, y[update_children]->tag)) {
 			strcat(y_cp->data, "<>");
 			y_cp->data_index += 2;

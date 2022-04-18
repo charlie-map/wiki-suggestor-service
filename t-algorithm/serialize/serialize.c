@@ -66,9 +66,24 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 	yomu_t *full_page, char **ID, document_vector_t *opt_doc, float frequency_scalar) {
 	int total_bag_size = 0;
 
+	int *page_token_check = malloc(sizeof(int));
+	yomu_t **page_tokens = yomu_f.children(full_page, "page", page_token_check);
+
+	if (*page_token_check == 0) {
+		free(page_tokens);
+		free(page_token_check);
+
+		return 1;
+	}
+
+	yomu_t *page_token = page_tokens[0];
+
+	free(page_tokens);
+	free(page_token_check);
+
 	// create title page:
 	// get ID
-	yomu_t **id_tokens = yomu_f.children(full_page, "id", NULL);
+	yomu_t **id_tokens = yomu_f.children(page_token, "id", NULL);
 	yomu_t *singleton_id = yomu_f.merge(1, id_tokens);
 	*ID = yomu_f.read(singleton_id, "");
 	int ID_len = strlen(*ID);
@@ -78,10 +93,9 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 	total_bag_size += ID_len - 1;
 
 	free(id_tokens);
-	yomu_f.destroy(singleton_id);
 
 	// get title
-	yomu_t **title_tokens = yomu_f.children(full_page, "title", NULL);
+	yomu_t **title_tokens = yomu_f.children(page_token, "title", NULL);
 	yomu_t *singleton_title = yomu_f.merge(1, title_tokens);
 	char *title = yomu_f.read(singleton_title, "");
 	if (opt_doc)
@@ -94,19 +108,15 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 	fputs(title, title_fp->runner);
 
 	free(title_tokens);
-	yomu_f.destroy(singleton_title);
 
 	free(title);
 
 	// grab full page data
 	int *word_number_max = malloc(sizeof(int));
-	yomu_t **page_tokens = yomu_f.children(full_page, "text", NULL);
-	yomu_t *page_token = yomu_f.merge(1, page_tokens);
-	free(page_tokens);
+	yomu_t **text_tokens = yomu_f.children(page_token, "text", NULL);
+	yomu_t *text_token = yomu_f.merge(1, text_tokens);
 
-	char *token_page_data = yomu_f.read(page_token, "-d-m", "!style");
-
-	yomu_f.destroy(page_token);
+	char *token_page_data = yomu_f.read(text_token, "-d-m", "!style");
 
 	// create an int array so we can know the length of each char *
 	int *phrase_len = malloc(sizeof(int));
