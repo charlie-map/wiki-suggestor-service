@@ -608,11 +608,13 @@ tag_reader read_tag(yomu_t *parent_tree, FILE *file, char *str_read, char **curr
 	tag_reader tag_read;
 
 	// searching for attributes
-	while ((*curr_line)[search_token] != '>') {
-
+	int prev_searches = 0;
+	while ((*curr_line)[search_token] != '>' ||
+		((*curr_line)[search_token] == '>' && !read_tag)) {
 		if ((*curr_line)[search_token] == '\n') {
 			if (!file)
 				str_read += (search_token + 1) * sizeof(char);
+			prev_searches += search_token + 1;
 			read_newline(curr_line, buffer_size, file, str_read);
 
 			search_token = 0;
@@ -640,15 +642,16 @@ tag_reader read_tag(yomu_t *parent_tree, FILE *file, char *str_read, char **curr
 			}
 
 			if ((*curr_line)[search_token] != ' ') {
-				attr_tag_name[attr_tag_name_index++] = (*curr_line)[search_token];
+				attr_tag_name[attr_tag_name_index] = (*curr_line)[search_token];
+				attr_tag_name_index++;
 
 				attr_tag_name = resize_array(attr_tag_name, &max_attr_tag_name, attr_tag_name_index, sizeof(char));
 				attr_tag_name[attr_tag_name_index] = '\0';
 			}
 		} else {
-			if ((!attr_tag_value_enclose_type && (*curr_line)[search_token] == '"') ||
+			if ((*curr_line)[search_token] == '"' || (*curr_line)[search_token] == '\'') {
+				if (start_attr_value && (!attr_tag_value_enclose_type && (*curr_line)[search_token] == '"') ||
 				(attr_tag_value_enclose_type && (*curr_line)[search_token] == '\'')) {
-				if (start_attr_value) {
 					// add to the token
 					char *tag_name = malloc(sizeof(char) * (attr_tag_name_index + 1));
 					strcpy(tag_name, attr_tag_name);
@@ -665,13 +668,16 @@ tag_reader read_tag(yomu_t *parent_tree, FILE *file, char *str_read, char **curr
 
 					memset(attr_tag_value, '\0', max_attr_tag_value * sizeof(char));
 					memset(attr_tag_name, '\0', max_attr_tag_name * sizeof(char));
-				} else {
+
+					search_token++;
+					continue;
+				} else if (attr_tag_value_index == 0) {
 					start_attr_value = 1;
 					attr_tag_value_enclose_type = (*curr_line)[search_token] == '\'';
-				}
 
-				search_token++;
-				continue;
+					search_token++;
+					continue;
+				}
 			}
 
 			if (!start_attr_value) {
@@ -679,7 +685,8 @@ tag_reader read_tag(yomu_t *parent_tree, FILE *file, char *str_read, char **curr
 				continue;
 			}
 
-			attr_tag_value[attr_tag_value_index++] = (*curr_line)[search_token];
+			attr_tag_value[attr_tag_value_index] = (*curr_line)[search_token];
+			attr_tag_value_index++;
 
 			attr_tag_value = resize_array(attr_tag_value, &max_attr_tag_value, attr_tag_value_index, sizeof(char));
 			attr_tag_value[attr_tag_value_index] = '\0';
@@ -739,14 +746,13 @@ int tokenizeMETA(FILE *file, char *str_read, yomu_t *curr_tree) {
 					curr_tree = grab_token_parent(curr_tree);
 
 					search_token = find_close_tag(file, str_read, buffer_reader, buffer_size, search_token) + 1;
+					curr_line = *buffer_reader;
 
 					continue;
 				}
 
-				if (!curr_tree) {
-					printf("uh oh\n");
-				}
 				tag_reader tag_read = read_tag(curr_tree, file, str_read, buffer_reader, buffer_size, search_token);
+				curr_line = *buffer_reader;
 				search_token = tag_read.new_search_token;
 
 				str_read = tag_read.update_str_read;
@@ -756,7 +762,7 @@ int tokenizeMETA(FILE *file, char *str_read, yomu_t *curr_tree) {
 					// add pointer to sub tree within data:
 					add_token_rolling_data(curr_tree, '<');
 					add_token_rolling_data(curr_tree, '>');
-
+					
 					curr_tree = grab_token_children(curr_tree);
 				}
 
