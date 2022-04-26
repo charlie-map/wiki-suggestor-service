@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <malloc.h>
 #include <math.h>
 
 #include "vecrep.h"
@@ -248,9 +249,9 @@ void *data_read(void *meta_ptr) {
 			read_body--;
 			continue;
 		}
+
 		pthread_mutex_unlock(ser_pt->sock_mutex);
 
-		// printf("CHECK: %s\n", res_body(wiki_page));
 		// parse the wiki data and write to the bag of words
 		yomu_t *new_wiki_page_token = yomu_f.parse(res_body(wiki_page));
 

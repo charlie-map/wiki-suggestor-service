@@ -105,12 +105,6 @@ int stack_destroy(stack_tv2 *stack) {
 
 
 
-struct Response {
-	hashmap *headers;
-	char *body;
-	int body_len;
-};
-
 res *res_create(hashmap *head, char *bo, int bo_len) {
 	res *new_res = malloc(sizeof(res));
 
@@ -477,12 +471,12 @@ res *send_req_helper(socket_t *socket, char *request_url, int *url_length, char 
 		buffer[copy_after_head - *header_end] = header_read[copy_after_head];
 	}
 
-	int buffer_bytes = curr_bytes_recv - *header_end * sizeof(char);
+	size_t buffer_bytes = curr_bytes_recv - *header_end * sizeof(char);
 	free(header_read);
 	free(header_end);
 
 	while (buffer_bytes < full_req_len) {
-		int new_bytes = recv(socket->sock, buffer + buffer_bytes, full_req_len - buffer_bytes, 0);
+		size_t new_bytes = recv(socket->sock, buffer + buffer_bytes, full_req_len - buffer_bytes, 0);
 
 		if (new_bytes == -1) {
 			continue;
