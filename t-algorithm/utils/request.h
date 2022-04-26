@@ -4,7 +4,11 @@
 #include "hashmap.h"
 #include "../serialize/serialize.h"
 
-typedef struct Response res;
+typedef struct Response {
+	hashmap *headers;
+	char *body;
+	int body_len;
+} res;
 char *res_body(res *re);
 int res_body_len(res *re);
 hashmap *res_headers(res *re);

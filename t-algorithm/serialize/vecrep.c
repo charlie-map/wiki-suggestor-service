@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <malloc.h>
 #include <math.h>
 
 #include "vecrep.h"
@@ -18,6 +19,8 @@
 
 #define DTF_THRESHOLD 4
 #define DTF_PERCENT_THRESHOLD 0.7
+
+int counter = 0;
 
 trie_t *fill_stopwords(char *stop_word_file) {
 	trie_t *trie = trie_create("-pc");
@@ -236,8 +239,10 @@ void *data_read(void *meta_ptr) {
 	for (int read_body = start_read_body; read_body < end_read_body; read_body++) {
 		pthread_mutex_lock(ser_pt->sock_mutex);
 
+		counter++;
 		res *wiki_page = send_req(*(ser_pt->sock_data), "/pull_data", "POST", "-b", "unique_id=$&name=$&passcode=$", array_body[read_body], REQ_NAME, REQ_PASSCODE);
 		if (!wiki_page) { // socket close!
+			printf("SOCKET CLOSE\n");
 			// reset socket:
 
 			destroy_socket(*(ser_pt->sock_data));
@@ -248,9 +253,22 @@ void *data_read(void *meta_ptr) {
 			read_body--;
 			continue;
 		}
+		printf("%d %d\n", counter, wiki_page);
+		if (strcmp(array_body[read_body], "Q184316") == 0) {
+			// printf("%s\n", res_body(wiki_page));
+			printf("found doc %d %d %d\n", wiki_page->body_len, strlen(wiki_page->body), malloc_usable_size(wiki_page->body));
+			printf("after test\n");
+		}
+		if (wiki_page->body_len != strlen(wiki_page->body) + 1)
+			printf("fuckkkkk\n");
+
 		pthread_mutex_unlock(ser_pt->sock_mutex);
 
-		// printf("CHECK: %s\n", res_body(wiki_page));
+		printf("CHECK: ");
+		for (int i = 0; i < 20; i++) {
+			printf("%c", res_body(wiki_page)[i]);
+		}
+		printf("\n");
 		// parse the wiki data and write to the bag of words
 		yomu_t *new_wiki_page_token = yomu_f.parse(res_body(wiki_page));
 
