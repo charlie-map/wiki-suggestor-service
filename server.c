@@ -35,7 +35,7 @@
 #define K 32
 #define CLUSTER_THRESHOLD 2
 
-#define RELOAD 1
+#define RELOAD 0
 
 #define RECOMMENDER_DOC_NUMBER 5
 
