@@ -167,6 +167,7 @@ int http_pull_to_file(trie_t *stopword_trie) {
 	res_destroy(response);
 
 	free(title_writer_mutex);
+	fflush(title_writer);
 	fclose(title_writer);
 
 	/* SAVE term freq and idf AND CREATE A DIFFERENT PROGRAM FOR BELOW */
@@ -179,6 +180,7 @@ int http_pull_to_file(trie_t *stopword_trie) {
 
 	free(word_len);
 	free(words);
+	fflush(index_writer);
 	fclose(index_writer);
 
 	deepdestroy__hashmap(term_freq);

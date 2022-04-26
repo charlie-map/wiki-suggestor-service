@@ -979,6 +979,7 @@ int tag_match(yomu_t *y, char *tag) {
 }
 
 int anti_tag_match(yomu_t *y, char *tag) {
+	// printf("%s v %s: %d\n", y->tag, tag, strcmp(y->tag, tag) == 0);
 	return !(strcmp(y->tag, tag + sizeof(char)) == 0);
 }
 
@@ -1012,7 +1013,7 @@ match_t match_create(int (*match)(yomu_t *, char *), char *match_tag) {
 */
 match_t *create_matches(char *match_param, int *match_param_length) {
 	int *sub_match_param_length = malloc(sizeof(int));
-	char **sub_match_params = split_string(match_param, ' ', sub_match_param_length, "-c");
+	char **sub_match_params = split_string(match_param, ' ', sub_match_param_length, "-c-r", all_is_range);
 
 	*match_param_length = *sub_match_param_length;
 	match_t *return_matches = malloc(sizeof(match_t) * *match_param_length);

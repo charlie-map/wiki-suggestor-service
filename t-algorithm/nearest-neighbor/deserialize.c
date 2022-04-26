@@ -30,6 +30,14 @@ int deserialize_title(char *title_reader, hashmap *doc_map, char ***ID, int *ID_
 	int line_buffer_length = 0;
 	while ((line_buffer_length = getline(&line_buffer, &line_buffer_size, index)) != -1) {
 		char **split_row = split_string(line_buffer, 0, row_num, "-d-r-c", delimeter_check, ": ", mirror);
+		
+		if (*row_num == 2)
+			printf("fuck\n");
+		printf("%d\n", *row_num);
+		if (*row_num < 2) {
+			free(split_row);
+			continue;
+		}
 
 		int title_length = line_buffer_length - (strlen(split_row[0]) + strlen(split_row[*row_num - 1]));
 		// now pull out the different components into a hashmap value:

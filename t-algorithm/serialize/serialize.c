@@ -84,8 +84,7 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 	// create title page:
 	// get ID
 	yomu_t **id_tokens = yomu_f.children(page_token, "id", NULL);
-	yomu_t *singleton_id = yomu_f.merge(1, id_tokens);
-	*ID = yomu_f.read(singleton_id, "");
+	*ID = yomu_f.read(id_tokens[0], "");
 	int ID_len = strlen(*ID);
 	if (opt_doc)
 		opt_doc->id = *ID;
@@ -96,8 +95,9 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 
 	// get title
 	yomu_t **title_tokens = yomu_f.children(page_token, "title", NULL);
-	yomu_t *singleton_title = yomu_f.merge(1, title_tokens);
-	char *title = yomu_f.read(singleton_title, "");
+	char *title = yomu_f.read(title_tokens[0], "");
+	if (strlen(title) < 2)
+		printf("OOOOOOOOOOOOOOF\n");
 	if (opt_doc)
 		opt_doc->title = title;
 
@@ -114,13 +114,13 @@ int token_to_terms(hashmap *term_freq, mutex_t *title_fp, trie_t *stopword_trie,
 	// grab full page data
 	int *word_number_max = malloc(sizeof(int));
 	yomu_t **text_tokens = yomu_f.children(page_token, "text", NULL);
-	yomu_t *text_token = yomu_f.merge(1, text_tokens);
 
-	char *token_page_data = yomu_f.read(text_token, "-d-m", "!style");
+	char *token_page_data = yomu_f.read(text_tokens[0], "-d-m", "!style");
 
 	// create an int array so we can know the length of each char *
 	int *phrase_len = malloc(sizeof(int));
 	char **full_page_data = split_string(token_page_data, ' ', word_number_max, "-l", &phrase_len);
+	printf("%s: %d words\n", *ID, *word_number_max);
 
 	free(token_page_data);
 
