@@ -353,6 +353,7 @@ char *read_token(yomu_t *search_token, char *option, ...) {
 	va_start(opt_list, option);
 
 	int *match_len = malloc(sizeof(int));
+	*match_len = 0;
 	match_t *match = NULL;
 
 	for (int o = 0; option[o]; o++) {
@@ -369,6 +370,9 @@ char *read_token(yomu_t *search_token, char *option, ...) {
 	char *data = token_read_all_data(search_token, data_len, match, match_len, deep_read);
 
 	free(data_len);
+
+	for (int free_match = 0; free_match < *match_len; free_match++)
+		free(match[free_match].match_tag);
 
 	free(match_len);
 	if (match)
