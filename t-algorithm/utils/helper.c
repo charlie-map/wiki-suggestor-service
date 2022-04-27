@@ -27,8 +27,8 @@ char *find_and_replace(char *original, char *match, char *replacer) {
 
 	int match_len = strlen(match), replacer_len = strlen(replacer);
 	int index_match_check = 0;
-	char *match_checker = malloc(sizeof(char) * match_len);
-	memset(match_checker, '\0', sizeof(char) * match_len);
+	char *match_checker = malloc(sizeof(char) * (match_len + 1));
+	memset(match_checker, '\0', sizeof(char) * (match_len + 1));
 	// start searching original for matches
 
 	for (int read_org = 0; original[read_org]; read_org++) {
@@ -62,11 +62,15 @@ char *find_and_replace(char *original, char *match, char *replacer) {
 				new[index_new] = '\0';
 			} else {
 				// strcat into new
-				new = resize_array(new, new_len, index_new + index_match_check + 1, sizeof(char));
+				new = resize_array(new, new_len, index_new + index_match_check + 2, sizeof(char));
 
 				strcat(new, match_checker);
+				index_new += index_match_check;
 
-				index_new += index_match_check - 1;
+				new[index_new] = original[read_org];
+				index_new++;
+
+				new[index_new] = '\0';
 
 				index_match_check = 0;
 			}

@@ -280,7 +280,7 @@ void data_send(int sock, hashmap *status_code, int status, char *options, ...) {
 			continue;
 
 		if (options[check_option + 1] == 't') {
-			insert__hashmap(headers, "Content-Type", "text/plain", "", NULL, compareCharKey, NULL);
+			insert__hashmap(headers, "Content-Type", "text/plain; charset=utf-8", "", NULL, compareCharKey, NULL);
 
 			data = va_arg(read_opts, char *);
 			data_length = strlen(data);

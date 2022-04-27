@@ -394,7 +394,7 @@ int has_attr_value(char **attribute, int attr_len, char *attr, char *attr_value)
 	attr_pos++;
 
 	int *classlist_len = malloc(sizeof(int));
-	char **classlist = split_string(attribute[attr_pos], ' ', classlist_len, "-c");
+	char **classlist = split_string(attribute[attr_pos], ' ', classlist_len, "-c-r", all_is_range);
 
 	int found_class = 0;
 	for (int check_classlist = 0; check_classlist < *classlist_len; check_classlist++) {
