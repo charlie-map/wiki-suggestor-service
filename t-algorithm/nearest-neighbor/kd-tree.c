@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 
 #include "kd-tree.h"
 #include "deserialize.h"
@@ -330,6 +331,9 @@ int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void
 
 	search_kdtree_helper(k_t, weight ? k_node->right : k_node->left, k_t->next_d(k_t->dimensions, dimension), search_payload, curr_s_ll, max_document_returns, current_payloads, number_of_payloads);
 
+	if (strcmp(((document_vector_t *) k_node->payload)->title, "Detachment (film)") == 0)
+		printf("detachment\n");
+
 	// if pq isn't full, add k_node anyways (if not already matched
 	if (curr_s_ll->pq_size < max_document_returns) {
 		if (is_not_search_node(k_node->payload, current_payloads, number_of_payloads))
@@ -355,7 +359,8 @@ int search_kdtree_helper(kdtree_t *k_t, kd_node_t *k_node, void *dimension, void
 	}
 
 	// otherwise see which one should be swapped out for the value at this position
-	skip(curr_s_ll, worst_pos)->payload = k_node->payload;
+	if (is_not_search_node(k_node->payload, current_payloads, number_of_payloads))
+		skip(curr_s_ll, worst_pos)->payload = k_node->payload;
 
 	free(meta_curr_document_distances);
 	free(node_curr_document_distance);
