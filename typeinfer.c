@@ -37,6 +37,7 @@ hashmap *infer_load() {
 	if_t *text_javascript = createInferenceLoad("text/javascript", 0);
 	if_t *image_png = createInferenceLoad("image/png", 1);
 	if_t *image_jpg = createInferenceLoad("image/jpg", 1);
+	if_t *app_json = createInferenceLoad("application/json", 0);
 
 	insert__hashmap(load_map, "txt", text_plain, "", NULL, compareCharKey, NULL);
 	insert__hashmap(load_map, "html", text_html, "", NULL, compareCharKey, NULL);
@@ -44,6 +45,7 @@ hashmap *infer_load() {
 	insert__hashmap(load_map, "js", text_javascript, "", NULL, compareCharKey, NULL);
 	insert__hashmap(load_map, "png", image_png, "", NULL, compareCharKey, NULL);
 	insert__hashmap(load_map, "jpg", image_jpg, "", NULL, compareCharKey, NULL);
+	insert__hashmap(load_map, "json", app_json, "", NULL, compareCharKey, NULL);
 
 	return load_map;
 }
@@ -76,9 +78,15 @@ char *content_type_infer(hashmap *load_map, char *filename, char *data, int data
 	// find last "." and read data after that
 		// if no ".", try inferring from the data within char *data
 	int isUTF8 = 0;
+	int containsJSON = 0;
 
 	int find_p;
 	for (find_p = strlen(filename) - 1; find_p >= 0; find_p--) {
+		if (filename[find_p] == '[' || filename[find_p] == ']' ||
+		    filename[find_p] == '{' || filename[find_p] == '}' ||
+		    filename[find_p] == '"')
+			containsJSON++;
+
 		if ((int) filename[find_p] > 127 && !isUTF8)
 			isUTF8 = 1;
 
@@ -86,10 +94,10 @@ char *content_type_infer(hashmap *load_map, char *filename, char *data, int data
 			break;
 	}
 
-	if (find_p >= 0)
+	if (find_p >= 0 && containsJSON < 4)
 		return end_type_script_check(load_map, filename, find_p);
 
-	return isUTF8 ? "text/plain; charset=utf-8" : "text/plain"; // no value
+	return containsJSON ? "application/json" : isUTF8 ? "text/plain; charset=utf-8" : "text/plain"; // no value
 }
 
 int is_binary(hashmap *load_map, char *filename) {

@@ -261,7 +261,7 @@ int p_tag_match(yomu_t *t) {
 }
 
 float compute_p_value(int vote, float vote_time, float focus_time, float avvt, float avft) {
-	return ((vote == 3 ? 3.1 : vote) - 3) * ((vote_time == 0 ? 0.1 : vote_time) / 
+	return ((vote == 3 ? 3.1 : vote) - 3) * ((vote_time == 0 ? 0.1 : vote_time) /
 		(avvt == 0 ? 0.1 : avvt)) * (focus_time / (avft == 0 ? 0.1 : avft));
 }
 
@@ -474,21 +474,21 @@ void unique_recommend_v2(req_t req, res_t res) {
 			float doc_freq = ((tf_t *) get__hashmap(term_freq->runner, user_words_top50[word_p], ""))->doc_freq * 1.0;
 			pthread_mutex_unlock(&term_freq->mutex);
 
-			printf("%s -- %1.3f * %1.3f - ", user_words_top50[word_p], doc_term_freq ? *doc_term_freq : 0, doc_freq);
+			//printf("%s -- %1.3f * %1.3f - ", user_words_top50[word_p], doc_term_freq ? *doc_term_freq : 0, doc_freq);
 			term_matrix[row_jump + word_p] = doc_term_freq ? (*doc_term_freq == 0 ? 0.1 * doc_freq : *doc_term_freq * doc_freq) : 0.0;
-			printf("final: %1.3f\n", term_matrix[row_jump + word_p]);
+			//printf("final: %1.3f\n", term_matrix[row_jump + word_p]);
 		}
 	}
 
 	deepdestroy__hashmap(user_term_freq);
 	// compute the weight for each term:
 	for (int i = 0; i < user_votes->row_count; i++) {
-		printf("%d: ", i);
+		//printf("%d: ", i);
 
 		for (int j = 0; j < *real_user_words_len; j++) {
-			printf("%lf - ", term_matrix[i * user_votes->row_count + j]);
+			//printf("%lf - ", term_matrix[i * user_votes->row_count + j]);
 		}
-		printf("\n");
+		//printf("\n");
 	}
 
 	printf("%d, %d\n", user_votes->row_count, *real_user_words_len);
@@ -607,13 +607,22 @@ void unique_recommend_v2(req_t req, res_t res) {
 		// then select p tags, (maybe look at first couple?)
 		// need a way to selectively choose if skips should occur
 		int choose_p_tag;
-		for (choose_p_tag = 0; choose_p_tag < *p_tag_len; choose_p_tag++)
+		for (choose_p_tag = 0; choose_p_tag < *p_tag_len; choose_p_tag++) {
+			char *yomu_has_shallow_data = yomu_f.read(p_yomu[choose_p_tag], "-s");
+
+			if (strlen(yomu_has_shallow_data) < 4) {
+				free(yomu_has_shallow_data);
+				continue;
+			} else
+				free(yomu_has_shallow_data);
+
 			if (!yomu_f.hasClass(p_yomu[choose_p_tag], "mw-empty-elt"))
 				break;
+		}
 
 		char *document_intro_pre;
 		if (choose_p_tag < *p_tag_len)
-			document_intro_pre = yomu_f.read(p_yomu[choose_p_tag], "");
+			document_intro_pre = yomu_f.read(p_yomu[choose_p_tag], "-m", "!style");
 		else {
 			document_intro_pre = malloc(sizeof(char) * 27);
 			strcpy(document_intro_pre, "Description not available.");
