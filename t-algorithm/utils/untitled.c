@@ -87,18 +87,20 @@ char *base64_encode(char *original, char base64[64]) {
 	for (int en = 0; en < original_len; en += 3) {
 		// create base2 representation
 		u_char *base2 = to_bit_pattern(original_len - en > 3 ? 3 : original_len - en,
-			(int) original[en], original_len - en > 2 ? (int) original[en + 1] : 0,
-			original_len - en > 3 ? (int) original[en + 2] : 0);
+			(int) original[en], original_len - en >= 2 ? (int) original[en + 1] : 0,
+			original_len - en >= 3 ? (int) original[en + 2] : 0);
 
 		// now pull out groups of 6 to compute the base64 value
-		for (int read_base2 = original_len - en > 3 ? 3 : original_len - en; read_base2 >= 0; read_base2--) {
+		for (int read_base2 = 0; read_base2 < 4; read_base2++) {
 			int base2_index = read_base2 * 6 + 5;
+			if (read_base2 > original_len - en)
+				continue;
 
 			printf("\nCOMPUTE INDEX:\n");
 			int final_index = convert_to_10(base2[base2_index - 5],
 				base2[base2_index - 4], base2[base2_index - 3], base2[base2_index - 2],
 				base2[base2_index - 1], base2[base2_index]);
-			printf("index: %d\n", final_index);
+			printf("index: %d --> %c\n", final_index, base64[final_index]);
 
 			encoded[encoded_index] = base64[final_index];
 			encoded_index++;
@@ -124,7 +126,8 @@ int main() {
 	char base64[64] = {
 		'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S',
 		'T','U','V','W','X','Y','Z','a','b','c','d','e','f','g','h','i','j','k','l',
-		'm','n','o','p','q','r','s','t','u','v','w','x','y','z','+','/','='
+		'm','n','o','p','q','r','s','t','u','v','w','x','y','z','0','1','2','3','4',
+		'5','6','7','8','9','+','/'
 	};
 
 	char *test = base64_encode("Hello", base64);
