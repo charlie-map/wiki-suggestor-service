@@ -130,9 +130,11 @@ int main() {
 		'5','6','7','8','9','+','/'
 	};
 
-	char *test = base64_encode("Hello", base64);
+	char *test = base64_encode("Hello there", base64);
 
 	printf("%s\n", test);
+
+	free(test);
 
 	return 0;
 }
