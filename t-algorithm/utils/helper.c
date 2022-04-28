@@ -3,6 +3,8 @@
 #include <stdarg.h>
 #include <string.h>
 
+#include <math.h>
+
 #include "helper.h"
 
 int mirror(int t, ...) {
@@ -231,4 +233,97 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 	free(max_curr_sub_word);
 
 	return arr;
+}
+
+// helper function for to_bit_pattern
+int convert_to_2(int num, u_char *binary_set, int binary_set_offset) {
+	u_char *binary_set = malloc(sizeof(u_char) * 8);
+
+	int reverse_counter = 7;
+	for (int i = 0; i < 8; i++) {
+		int power = _pow(2, reverse_counter);
+
+		binary_set[(binary_set_offset * 8) + i] = num - power >= 0;
+
+		num -= num - power >= 0 ? power : 0;
+		reverse_counter--;
+	}
+
+	return 0;
+}
+/*
+	Takes in `char_num` number of characters (max of 3)
+	and returns the given u_char * bits that represent each character
+	if the input is: "to_bit_pattern(3, 'M', 'a', 'n')", the response would be:
+
+	[0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 1, 1, 0]
+*/
+u_char *to_bit_pattern(int char_num, ...) {
+	va_list char_to_bit;
+	va_start(char_to_bit, char_num);
+
+	u_char *return_bits = malloc(sizeof(u_char) * (char_num * 8));
+
+	for (int read_char = 0; read_char < char_num; read_char++) {
+		int num_char = (int) va_arg(char_to_bit, char);
+
+		convert_to_2(num_char, return_bits, read_char);
+	}
+
+	return return_bits;
+}
+
+
+int _pow(int num, int pow) {
+	if (num == 0)
+		return 0;
+
+	if (pow == 0)
+		return 1;
+
+	int final = num;
+
+	for (int multi = 1; multi < pow; multi++) {
+		final *= num;
+	}
+
+	return final;
+}
+
+// classic
+int convert_to_10(int _0, int _1, int _2, int _3, int _4, int _5) {
+	int pow0 = _pow(_0 ? 2 : 0, 5);
+	int pow1 = _pow(_1 ? 2 : 0, 4);
+	int pow2 = _pow(_2 ? 2 : 0, 3);
+	int pow3 = _pow(_3 ? 2 : 0, 2);
+	int pow4 = _pow(_4 ? 2 : 0, 1);
+	int pow5 = _pow(_5 ? 2 : 0, 0);
+
+	return pow0 + pow1 + pow2 + pow3 + pow4 + pow5;
+}
+
+// converts ASCII string to a base64 string
+char *base64_encode(char *original) {
+	int original_len = strlen(original_len);
+
+	char *encoded = malloc(sizeof(char) * (ceil(original_len / 3) * 4));
+
+	// loop through 3 characters at a time
+	for (int en = 0; en < original_len; en += 3) {
+		// create base2 representation
+		u_char *base2 = to_bit_pattern(original_len - en > 3 ? 3 : original_len - en,
+			original[en], original_len - en > 2 ? original[en + 1] : 0,
+			original_len - en > 3 ? original[en + 2] : 0);
+
+		// now pull out groups of 6 to compute the base64 value
+		for (int read_base2 = original_len - en > 3 ? 2 : original_len - en - 1; read_base2 >= 0; read_base2--) {
+			int base2_index = read_base2 * 6;
+
+			encoded[en + read_base2] = (char) convert_to_10(base2[read_base2 - 5],
+				base2[read_base2 - 4], base2[read_base2 - 3], base2[read_base2 - 2],
+				base2[read_base2 - 1], base2[read_base2]);
+		}
+	}
+
+	return encoded;
 }
