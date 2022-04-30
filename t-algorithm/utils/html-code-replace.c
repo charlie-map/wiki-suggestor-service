@@ -10,13 +10,42 @@ hashmap *html_code_stash;
 int html_code_init() {
 	html_code_stash = make__hashmap(0, NULL, destroyCharKey);
 
-	char *test = malloc(sizeof(char) * 7);
-	strcpy(test, "&euro;");
-	insert__hashmap(html_code_stash, "€", test, "", NULL, compareCharKey, NULL);
+	FILE *fp = fopen("charToHTML.txt", "r");
+
+	size_t buffer_page_size = sizeof(char);
+	char *buffer_page = malloc(sizeof(char));
+	int line_len = 0, *HTMLmatch_len = malloc(sizeof(int));
+	while ((line_len = getline(&buffer_page, &buffer_page_size, fp)) != -1) {
+		char **HTMLmatch = split_string(buffer_page, ' ', HTMLmatch_len, "-c-r-d", all_is_range, delimeter_check, " \n");
+	
+		// printf("%d -- %s, %s\n", *HTMLmatch_len, HTMLmatch[0], HTMLmatch[1]);
+
+		if (*HTMLmatch_len != 2) {
+			for (int f = 0; f < *HTMLmatch_len; f++)
+				free(HTMLmatch[f]);
+
+			free(HTMLmatch);
+
+			continue;
+		}
+
+		insert__hashmap(html_code_stash, HTMLmatch[0], HTMLmatch[1], "", NULL, compareCharKey, destroyCharKey);
+
+		free(HTMLmatch);
+	}
+
+	free(buffer_page);
+	fclose(fp);
+
+	free(HTMLmatch_len);
+
+	return 0;
 }
 
 int html_code_close() {
 	deepdestroy__hashmap(html_code_stash);
+
+	return 0;
 }
 
 /* The first byte of a UTF-8 character
@@ -69,6 +98,8 @@ char *html_code(char *original) {
 
 		search_char[add_bytes] = '\0';
 		char *replace_char = get__hashmap(html_code_stash, search_char, "");
+
+		free(search_char);
 
 		if (!replace_char)
 			replace_char = "";

@@ -226,7 +226,7 @@ char **split_string(char *full_string, char delimeter, int *arr_len, char *extra
 
 		arr_index--;
 	} else if (minor_length)
-			(*minor_length)[arr_index] = curr_sub_word_index;
+		(*minor_length)[arr_index] = curr_sub_word_index;
 
 	*arr_len = arr_index + 1;
 
