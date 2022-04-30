@@ -2,7 +2,11 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <assert.h>
+
 #include <math.h>
+
+#include "html-code-replace.h"
 
 int _pow(int num, int pow) {
 	if (num == 0)
@@ -71,7 +75,7 @@ int convert_to_10(int _0, int _1, int _2, int _3, int _4, int _5) {
 	int pow4 = _pow(_4 ? 2 : 0, 1);
 	int pow5 = _pow(_5 ? 2 : 0, 0);
 
-	printf("power (%d, %d, %d, %d, %d, %d): %d\n", pow0, pow1, pow2, pow3, pow4, pow5, pow0 + pow1 + pow2 + pow3 + pow4 + pow5);
+	// printf("power (%d, %d, %d, %d, %d, %d): %d\n", pow0, pow1, pow2, pow3, pow4, pow5, pow0 + pow1 + pow2 + pow3 + pow4 + pow5);
 	return pow0 + pow1 + pow2 + pow3 + pow4 + pow5;
 }
 
@@ -90,17 +94,23 @@ char *base64_encode(char *original, char base64[64]) {
 			(int) original[en], original_len - en >= 2 ? (int) original[en + 1] : 0,
 			original_len - en >= 3 ? (int) original[en + 2] : 0);
 
+		printf("LINE: \n");
+		for (int i = 0; i < 24; i++) {
+			printf("%d", base2[i]);
+		}
+		printf("\n");
+
 		// now pull out groups of 6 to compute the base64 value
 		for (int read_base2 = 0; read_base2 < 4; read_base2++) {
 			int base2_index = read_base2 * 6 + 5;
 			if (read_base2 > original_len - en)
 				continue;
 
-			printf("\nCOMPUTE INDEX:\n");
+			//printf("\nCOMPUTE INDEX:\n");
 			int final_index = convert_to_10(base2[base2_index - 5],
 				base2[base2_index - 4], base2[base2_index - 3], base2[base2_index - 2],
 				base2[base2_index - 1], base2[base2_index]);
-			printf("index: %d --> %c\n", final_index, base64[final_index]);
+			//printf("index: %d --> %c\n", final_index, base64[final_index]);
 
 			encoded[encoded_index] = base64[final_index];
 			encoded_index++;
@@ -122,19 +132,68 @@ char *base64_encode(char *original, char base64[64]) {
 	return encoded;
 }
 
+int test(char base64[64]) {
+	// testing unstructured inputs with different character sets
+	// char *hello_world = base64_encode("Hello world.", base64);
+	// assert(strcmp(hello_world, "SGVsbG8gd29ybGQu") == 0);
+	// free(hello_world);
+
+	// char *ABS_abs_num = base64_encode("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", base64);
+	// assert(strcmp(ABS_abs_num, "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVphYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ejAxMjM0NTY3ODk=") == 0);
+	// free(ABS_abs_num);
+
+	// extended ASCII testing
+	// char *special_characters0 = base64_encode(" !\"#$%&'()*+,-./:;<=>?@", base64);
+	char *special_characters1 = base64_encode("[\\]^_`{|}~€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”", base64);
+	printf("%s\n", special_characters1);
+	// char *special_characters2 = base64_encode("•–—˜™š›œžŸ¡¢£¤¥¦§¨©ª«¬®¯", base64);
+	// char *special_characters3 = base64_encode("°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇ", base64);
+	// char *special_characters4 = base64_encode("ÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß", base64);
+	// char *special_characters5 = base64_encode("àáâãäåæçèéêëìíîïðñòóôõö÷", base64);
+	// char *special_characters6 = base64_encode("øùúûüýþÿ", base64);
+
+	// assert(strcmp(special_characters0, "ICEiIyQlJicoKSorLC0uLzo7PD0+P0A=") == 0);
+	assert(strcmp(special_characters1, "W1xdXl9ge3x9fuKCrOKAmsaS4oCe4oCm4oCg4oChy4bigLDFoOKAucWSxb3igJjigJnigJzigJ0=") == 0);
+	// assert(strcmp(special_characters2, "4oCi4oCT4oCUy5zihKLFoeKAusWTxb7FuMKhwqLCo8KkwqXCpsKnwqjCqcKqwqvCrMKuwq8=") == 0);
+	// assert(strcmp(special_characters3, "wrDCscKywrPCtMK1wrbCt8K4wrnCusK7wrzCvcK+wr/DgMOBw4LDg8OEw4XDhsOH") == 0);
+	// assert(strcmp(special_characters4, "w4jDicOKw4vDjMONw47Dj8OQw5HDksOTw5TDlcOWw5fDmMOZw5rDm8Ocw53DnsOf") == 0);
+	// assert(strcmp(special_characters5, "w6DDocOiw6PDpMOlw6bDp8Oow6nDqsOrw6zDrcOuw6/DsMOxw7LDs8O0w7XDtsO3") == 0);
+	// assert(strcmp(special_characters6, "w7jDucO6w7vDvMO9w77Dvw==") == 0);
+
+	// free(special_characters0);
+	free(special_characters1);
+	// free(special_characters2);
+	// free(special_characters3);
+	// free(special_characters4);
+	// free(special_characters5);
+	// free(special_characters6);
+
+	return 0;
+}
+
 int main() {
-	char base64[64] = {
-		'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S',
-		'T','U','V','W','X','Y','Z','a','b','c','d','e','f','g','h','i','j','k','l',
-		'm','n','o','p','q','r','s','t','u','v','w','x','y','z','0','1','2','3','4',
-		'5','6','7','8','9','+','/'
-	};
+	// char base64[64] = {
+	// 	'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S',
+	// 	'T','U','V','W','X','Y','Z','a','b','c','d','e','f','g','h','i','j','k','l',
+	// 	'm','n','o','p','q','r','s','t','u','v','w','x','y','z','0','1','2','3','4',
+	// 	'5','6','7','8','9','+','/'
+	// };
 
-	char *test = base64_encode("Hello there", base64);
+	html_code_init();
 
-	printf("%s\n", test);
+	char *test_arr = malloc(sizeof(char) * 22);
+	strcpy(test_arr, "The euro symbol: €");
 
-	free(test);
+	printf("%s\n", test_arr);
+
+	char *new_test_arr = html_code(test_arr);
+
+	printf("%s\n", new_test_arr);
+
+	free(test_arr);
+	free(new_test_arr);
+
+	html_code_close();
 
 	return 0;
 }
