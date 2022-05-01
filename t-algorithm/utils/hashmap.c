@@ -66,7 +66,7 @@ unsigned long hash(unsigned char *str) {
 
 // define some linked list functions (see bottom of file for function write outs):
 ll_main_t *ll_makeNode(vtableKeyStore key, void *value, int hash__type);
-int ll_insert(ll_main_t *node, vtableKeyStore key, void *payload, int hash__type, void (*destroy)(void *));
+int ll_insert(ll_main_t *node, vtableKeyStore key, void *payload, int hash__type, void (*destroy)(void *), int *hasReplaced);
 
 ll_main_t *ll_next(ll_main_t *curr);
 
@@ -116,16 +116,10 @@ int re__hashmap(hashmap *hash__m) {
 	for (int old__mapPos = 0; old__mapPos < old__mapLength; old__mapPos++) {
 		// look at each bucket
 		// if there is contents
-		while (hash__m->map[old__mapPos]) { // need to look at each linked node
+		ll_main_t *curr = hash__m->map[old__mapPos];
+		while (curr) { // need to look at each linked node
 			// recalculate hash
-			new__mapPos = hash(hash__m->map[old__mapPos]->key.key) % new__mapLength;
-
-			// store the node in temporary storage
-			ll_main_t *currNode = hash__m->map[old__mapPos];
-
-			// extract currNode from old map (hash__m->map)
-			hash__m->map[old__mapPos] = ll_next(currNode); // advance root
-			ll_isolate(currNode); // isolate old root
+			new__mapPos = hash(curr->key.key) % new__mapLength;
 
 			// defines the linked list head in the new map
 			ll_main_t *new__mapBucketPtr = new__map[new__mapPos];
@@ -135,9 +129,14 @@ int re__hashmap(hashmap *hash__m) {
 
 				while (new__mapBucketPtr->next) new__mapBucketPtr = ll_next(new__mapBucketPtr);
 
-				new__mapBucketPtr->next = currNode;
+				new__mapBucketPtr->next = curr;
 			} else
-				new__map[new__mapPos] = currNode;
+				new__map[new__mapPos] = curr;
+
+			// move curr forward
+			ll_main_t *buffer = curr->next;
+			curr->next = NULL;
+			curr = buffer;
 		}
 	}
 
@@ -152,9 +151,12 @@ int METAinsert__hashmap(hashmap *hash__m, vtableKeyStore key, void *value) {
 	int mapPos = hash(key.key) % hash__m->hashmap__size;
 	int bucketLength = 0; // counts size of the bucket at mapPos
 
+	int *has_replaced = malloc(sizeof(int));
+	*has_replaced = 0;
+
 	// see if there is already a bucket defined at mapPos
 	if (hash__m->map[mapPos])
-		bucketLength = ll_insert(hash__m->map[mapPos], key, value, hash__m->hash__type, hash__m->destroy);
+		bucketLength = ll_insert(hash__m->map[mapPos], key, value, hash__m->hash__type, hash__m->destroy, has_replaced);
 	else
 		hash__m->map[mapPos] = ll_makeNode(key, value, hash__m->hash__type);
 
@@ -163,7 +165,9 @@ int METAinsert__hashmap(hashmap *hash__m, vtableKeyStore key, void *value) {
 	if (bucketLength >= MAX_BUCKET_SIZE)
 		re__hashmap(hash__m);
 
-	return 0;
+	int return_has_replaced = *has_replaced;
+	free(has_replaced);
+	return return_has_replaced;
 }
 
 int ll_get_keys(ll_main_t *ll_node, void ***keys, int *max_key, int key_index, int (*is_m)(void *, void *), void *m_cmp) {
@@ -549,7 +553,8 @@ int ll_specialUpdateArray(ll_main_t *ll_pointer, void *newValue) {
 }
 
 // finds the tail and appends
-int ll_insert(ll_main_t *crawler__node, vtableKeyStore key, void *newValue, int hash__type, void (*destroy)(void *)) {
+// hasReplaced: sees if this value takes the place of another
+int ll_insert(ll_main_t *crawler__node, vtableKeyStore key, void *newValue, int hash__type, void (*destroy)(void *), int *hasReplaced) {
 
 	int bucket_size = 1, addedPayload = 0;
 
@@ -562,6 +567,7 @@ int ll_insert(ll_main_t *crawler__node, vtableKeyStore key, void *newValue, int 
 			if (hash__type == 0) {
 				crawler__node->ll_meat = ll_specialUpdateIgnore(crawler__node->ll_meat, newValue, destroy);
 				addedPayload = 1;
+				*hasReplaced = 1;
 			} else if (hash__type == 1) {
 				ll_specialUpdateArray(crawler__node, newValue);
 				addedPayload = 1;
@@ -576,6 +582,7 @@ int ll_insert(ll_main_t *crawler__node, vtableKeyStore key, void *newValue, int 
 		if (hash__type == 0) {
 			crawler__node->ll_meat = ll_specialUpdateIgnore(crawler__node->ll_meat, newValue, destroy);
 			addedPayload = 1;
+			*hasReplaced = 1;
 		} else if (hash__type == 1) {
 			ll_specialUpdateArray(crawler__node, newValue);
 			addedPayload = 1;
@@ -660,7 +667,9 @@ void printCharKey(void *characters) {
 int compareCharKey(void *characters, void *otherValue) {
 	return strcmp((char *) characters, (char *) otherValue) == 0;
 }
-void destroyCharKey(void *characters) { free(characters); }
+void destroyCharKey(void *characters) { 
+	free(characters);
+}
 
 void printIntKey(void *integer) {
 	printf("%d", *((int *) integer));
@@ -698,9 +707,9 @@ int insert__hashmap(hashmap *hash__m, void *key, void *value, ...) {
 		// does no exist
 	}	
 
-	METAinsert__hashmap(hash__m, inserter, value);
+	int return_dat = METAinsert__hashmap(hash__m, inserter, value);
 
-	return 0;
+	return return_dat;
 }
 
 char *read_key(char *buffer, int *key_len) {

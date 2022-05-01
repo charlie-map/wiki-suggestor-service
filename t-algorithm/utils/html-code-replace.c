@@ -8,7 +8,7 @@
 hashmap *html_code_stash;
 
 int html_code_init() {
-	html_code_stash = make__hashmap(0, NULL, destroyCharKey);
+	html_code_stash = make__hashmap(0, printCharKey, destroyCharKey);
 
 	FILE *fp = fopen("charToHTML.txt", "r");
 
@@ -18,8 +18,6 @@ int html_code_init() {
 	while ((line_len = getline(&buffer_page, &buffer_page_size, fp)) != -1) {
 		char **HTMLmatch = split_string(buffer_page, ' ', HTMLmatch_len, "-c-r-d", all_is_range, delimeter_check, " \n");
 	
-		// printf("%d -- %s, %s\n", *HTMLmatch_len, HTMLmatch[0], HTMLmatch[1]);
-
 		if (*HTMLmatch_len != 2) {
 			for (int f = 0; f < *HTMLmatch_len; f++)
 				free(HTMLmatch[f]);
@@ -29,7 +27,10 @@ int html_code_init() {
 			continue;
 		}
 
-		insert__hashmap(html_code_stash, HTMLmatch[0], HTMLmatch[1], "", NULL, compareCharKey, destroyCharKey);
+		int should_free = insert__hashmap(html_code_stash, HTMLmatch[0], HTMLmatch[1], "", printCharKey, compareCharKey, destroyCharKey);
+
+		if (should_free)
+			free(HTMLmatch[0]);
 
 		free(HTMLmatch);
 	}
