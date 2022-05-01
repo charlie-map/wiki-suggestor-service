@@ -15,8 +15,9 @@
 #include "t-algorithm/nearest-neighbor/k-means.h"
 #include "t-algorithm/nearest-neighbor/deserialize.h"
 #include "t-algorithm/nearest-neighbor/document-vector.h"
-#include "t-algorithm/utils/hashmap.h"
 #include "t-algorithm/utils/helper.h"
+#include "t-algorithm/utils/hashmap.h"
+#include "t-algorithm/utils/html-code-replace.h"
 
 // database
 #include "databaseC/db.h"
@@ -69,6 +70,7 @@ void unique_recommend_v2(req_t req, res_t res);
 int main() {
 	teru_t app = teru();
 	yomu_f.init();
+	html_code_init();
 
 	app_post(app, "/nn", nearest_neighbor);
 	app_post(app, "/ur", unique_recommend_v2);
@@ -155,6 +157,7 @@ int main() {
 	trie_destroy(stopword_trie);
 	mysql_close(db);
 	yomu_f.close();
+	html_code_close();
 
 	return 0;
 }
@@ -633,7 +636,9 @@ void unique_recommend_v2(req_t req, res_t res) {
 
 		char *document_intro;
 		if (document_intro_pre) {
-			char *document_intro_fix_quote = find_and_replace(document_intro_pre, "\"", "&ldquo;");
+			char *document_intro_remove_extended_ascii = html_code(document_intro_pre);
+
+			char *document_intro_fix_quote = find_and_replace(document_intro_remove_extended_ascii, "\"", "&ldquo;");
 			char *document_intro_fix_space = find_and_replace(document_intro_fix_quote, "&nbsp;", " ");
 			char *document_intro_fix_tab = find_and_replace(document_intro_fix_space, "\t", " ");
 			char *document_intro_fix_newline = find_and_replace(document_intro_fix_tab, "\n", " ");
